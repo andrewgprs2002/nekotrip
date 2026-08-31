@@ -1,0 +1,24 @@
+node_modules
+.next
+.env
+.env.local
+.env*.local
+.vercel
+
+# Local environment
+.env
+.env.local
+.env*.local
+
+# Dependencies / Next.js
+node_modules/
+.next/
+.vercel/
+
+# NekoTrip old local patches / backups
+nekotrip-v*/
+*.zip
+
+# Misc
+.DS_Store
+Thumbs.db
