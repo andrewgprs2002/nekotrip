@@ -17,6 +17,15 @@ export interface TripDay {
   date: string | null;
   title: string;
   orderIndex: number;
+
+  // Per-day route planning settings (v0.6+)
+  routeStartTripPlaceId: string | null;
+  routeEndTripPlaceId: string | null;
+  routeDepartureTime: string | null;
+  routeArrivalTime: string | null;
+  routeTimeAnchor: 'departure' | 'arrival';
+  avoidTolls: boolean;
+  avoidHighways: boolean;
 }
 
 export interface Place {
