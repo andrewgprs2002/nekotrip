@@ -39,6 +39,7 @@ export default async function TripPage({ params }: { params: Promise<{ tripId: s
     tripName={trip.name}
     tripStartDate={trip.start_date}
     tripEndDate={trip.end_date}
+    tripTimezone={trip.timezone || 'UTC'}
     userId={user.id}
     userName={profile?.display_name || user.email || 'Traveler'}
     memberRole={membership.role as TripRole}
