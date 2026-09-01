@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <section className="authCard">
       <div className="eyebrow">NekoTrip</div>
       <h1>Sign in</h1>
-      <p className="muted">No password to share or remember. We send a one-time magic link to your email.</p>
+      <p className="muted">No password to remember. We send a one-time verification code to your email.</p>
       <LoginForm nextPath={nextPath} />
     </section>
   </main>;
