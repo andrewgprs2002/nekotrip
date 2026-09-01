@@ -30,7 +30,7 @@ export function LoginForm({ nextPath = '/' }: { nextPath?: string }) {
 
       setCode('');
       setCodeSent(true);
-      setMessage('Verification code sent. Check your email and enter the 6-digit code below.');
+      setMessage('Verification code sent. Check your email and enter the code below.');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Unable to send verification code.');
     } finally {
@@ -44,7 +44,7 @@ export function LoginForm({ nextPath = '/' }: { nextPath?: string }) {
     const cleanEmail = email.trim();
     const cleanCode = code.replace(/\D/g, '');
 
-    if (!cleanEmail || cleanCode.length !== 6) return;
+    if (!cleanEmail || cleanCode.length < 6 || cleanCode.length > 10) return;
 
     setBusy(true);
     setMessage('');
@@ -99,16 +99,16 @@ export function LoginForm({ nextPath = '/' }: { nextPath?: string }) {
         type="text"
         inputMode="numeric"
         autoComplete="one-time-code"
-        maxLength={6}
+        maxLength={10}
         required
         value={code}
-        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-        placeholder="123456"
+        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 10))}
+        placeholder="Enter code"
         autoFocus
       />
     </label>
 
-    <button className="primaryButton" type="submit" disabled={busy || code.length !== 6}>
+    <button className="primaryButton" type="submit" disabled={busy || code.length < 6 || code.length > 10}>
       {busy ? 'Verifying…' : 'Sign in'}
     </button>
 
