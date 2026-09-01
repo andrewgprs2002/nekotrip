@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -15,7 +15,7 @@ import type { TripDay, TripPlaceItem, TripRole } from '@/lib/domain/types';
 
 const categories = ['Sightseeing', 'Restaurant', 'Cafe', 'Hotel', 'Onsen', 'Shopping', 'Station'];
 const categoryIcons: Record<string, string> = {
-  Sightseeing: 'ðŸ“·', Restaurant: 'ðŸ£', Cafe: 'â˜•', Hotel: 'ðŸ¨', Onsen: 'â™¨ï¸', Shopping: 'ðŸ›ï¸', Station: 'ðŸš‰',
+  Sightseeing: '📷', Restaurant: '🍣', Cafe: '☕', Hotel: '🏨', Onsen: '♨️', Shopping: '🛍️', Station: '🚉',
 };
 
 function errorMessage(cause: unknown, fallback: string) {
@@ -75,7 +75,7 @@ export function TripWorkspace({
   const [busyPlaceId, setBusyPlaceId] = useState<string | null>(null);
   const [routeMode, setRouteMode] = useState<RouteMode>('DRIVING');
   const [trafficAware, setTrafficAware] = useState(false);
-  const [routeSummary, setRouteSummary] = useState<RouteSummary>({ state: 'idle', mode: 'DRIVING', distance: 'â€”', duration: 'â€”', distanceMeters: 0, durationMillis: 0, legs: [], warnings: [] });
+  const [routeSummary, setRouteSummary] = useState<RouteSummary>({ state: 'idle', mode: 'DRIVING', distance: '—', duration: '—', distanceMeters: 0, durationMillis: 0, legs: [], warnings: [] });
   const [routeStartId, setRouteStartId] = useState('');
   const [routeEndId, setRouteEndId] = useState('');
   const [routeDepartureTime, setRouteDepartureTime] = useState('08:00');
@@ -192,7 +192,7 @@ export function TripWorkspace({
   }
 
   function formatClock(date: Date | null) {
-    if (!date) return 'â€”';
+    if (!date) return '—';
     try {
       return new Intl.DateTimeFormat('en-US', { timeZone: tripTimezone, hour: 'numeric', minute: '2-digit' }).format(date);
     } catch {
@@ -299,18 +299,11 @@ export function TripWorkspace({
 
   const refreshPlaces = useCallback(async () => {
     const requestId = ++refreshPlacesRequestRef.current;
-
     try {
       const nextItems = await loadTripPlaces(supabaseRef.current!, tripId, userId);
-
-      // Multiple refresh sources can overlap (RPC, Realtime, polling/focus).
-      // Only the newest request is allowed to update React state.
       if (requestId !== refreshPlacesRequestRef.current) return;
-
       setItems(nextItems);
-      setSelectedId((current) =>
-        current && nextItems.some((item) => item.id === current) ? current : null
-      );
+      setSelectedId((current) => current && nextItems.some((item) => item.id === current) ? current : null);
     } catch (cause) {
       if (requestId !== refreshPlacesRequestRef.current) return;
       setMessage(cause instanceof Error ? cause.message : 'Unable to refresh trip places.');
@@ -492,7 +485,7 @@ export function TripWorkspace({
     const text = query.trim();
     if (!text) return;
     if (!providerRef.current) {
-      setMessage('Google Maps API key å°šæœªè¨­å®šã€‚è«‹å…ˆå®Œæˆ .env.local è¨­å®šã€‚');
+      setMessage('Google Maps API key 尚未設定。請先完成 .env.local 設定。');
       return;
     }
     setSearching(true);
@@ -500,7 +493,7 @@ export function TripWorkspace({
     try {
       const found = await providerRef.current.search(text);
       setResults(found);
-      if (found.length === 0) setMessage('Google Places æ‰¾ä¸åˆ°ç¬¦åˆçš„åœ°é»žï¼Œè«‹æ›å€‹åç¨±æˆ–åŠ ä¸ŠåŸŽå¸‚åç¨±ã€‚');
+      if (found.length === 0) setMessage('Google Places 找不到符合的地點，請換個名稱或加上城市名稱。');
     } catch (cause) {
       setResults([]);
       setMessage(cause instanceof Error ? cause.message : 'Google Places search failed.');
@@ -531,7 +524,7 @@ export function TripWorkspace({
       setSelectedId(typeof data === 'string' ? data : null);
       setQuery('');
       setResults([]);
-      setMessage(`å·²åŠ å…¥ ${name}ã€‚è³‡æ–™å·²å­˜é€² Supabaseï¼Œå…¶ä»–é–‹è‘—é€™è¶Ÿæ—…ç¨‹çš„äººæœƒå³æ™‚æ”¶åˆ°æ›´æ–°ã€‚`);
+      setMessage(`已加入 ${name}。資料已存進 Supabase，其他開著這趟旅程的人會即時收到更新。`);
       await refreshPlaces();
       await broadcastTripChanged('place_added');
     } catch (cause) {
@@ -565,24 +558,15 @@ export function TripWorkspace({
     const nextPriority = changes.priority ?? current.priority;
 
     const previousItems = items;
-
     setBusyPlaceId(id);
     setMessage('');
-
-    // Keep the controlled selectors stable while the RPC is in flight.
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.id === id
-          ? {
-              ...item,
-              dayId: nextDayId,
-              category: nextCategory,
-              priority: nextPriority,
-            }
+          ? { ...item, dayId: nextDayId, category: nextCategory, priority: nextPriority }
           : item
       )
     );
-
     try {
       const { error } = await supabaseRef.current!.rpc('update_trip_place_details', {
         p_trip_place_id: id,
@@ -643,9 +627,9 @@ export function TripWorkspace({
   return <main className="tripShell">
     <header className="tripHeader">
       <div>
-        <div className="eyebrow">NekoTrip Â· {memberRole}</div>
+        <div className="eyebrow">NekoTrip · {memberRole}</div>
         <h1>{tripTitle}</h1>
-        <div className="subtitle">{userName} Â· <span className={realtimeStatus === 'live' ? 'liveText' : realtimeStatus === 'error' ? 'errorText' : ''}>{realtimeStatus === 'live' ? 'â— Live sync Â· realtime + DB fallback' : realtimeStatus === 'error' ? 'â— Live sync Â· DB fallback' : 'â—‹ Connecting realtime Â· DB fallback active'}</span></div>
+        <div className="subtitle">{userName} · <span className={realtimeStatus === 'live' ? 'liveText' : realtimeStatus === 'error' ? 'errorText' : ''}>{realtimeStatus === 'live' ? '● Live sync · realtime + DB fallback' : realtimeStatus === 'error' ? '● Live sync · DB fallback' : '○ Connecting realtime · DB fallback active'}</span></div>
       </div>
       <div className="headerActions">
         <div className="memberPill"><span className="onlineDot" /> {memberCount} member{memberCount === 1 ? '' : 's'}</div>
@@ -680,11 +664,11 @@ export function TripWorkspace({
         </div>
 
         <form onSubmit={(event) => { event.preventDefault(); void searchPlaces(); }} className="placeForm">
-          <input value={query} disabled={!canEdit} onChange={(event) => { setQuery(event.target.value); setResults([]); setMessage(''); }} placeholder="ä¾‹å¦‚ï¼šè»½äº•æ²¢ãƒ—ãƒªãƒ³ã‚¹ã‚·ãƒ§ãƒƒãƒ”ãƒ³ã‚°ãƒ—ãƒ©ã‚¶" aria-label="Place search" />
+          <input value={query} disabled={!canEdit} onChange={(event) => { setQuery(event.target.value); setResults([]); setMessage(''); }} placeholder="例如：軽井沢プリンスショッピングプラザ" aria-label="Place search" />
           <div className="formRow">
             <select value={dayId} disabled={!canEdit} onChange={(event) => setDayId(event.target.value)} aria-label="Trip day">
               <option value="">Unplanned</option>
-              {days.map((value) => <option key={value.id} value={value.id}>{value.title}{value.date ? ` Â· ${value.date}` : ''}</option>)}
+              {days.map((value) => <option key={value.id} value={value.id}>{value.title}{value.date ? ` · ${value.date}` : ''}</option>)}
             </select>
             <select value={category} disabled={!canEdit} onChange={(event) => setCategory(event.target.value)} aria-label="Category">
               {categories.map((value) => <option key={value}>{value}</option>)}
@@ -692,9 +676,9 @@ export function TripWorkspace({
           </div>
           <div className="formRow">
             <select value={priority} disabled={!canEdit} onChange={(event) => setPriority(Number(event.target.value))} aria-label="Your priority">
-              {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{'â˜…'.repeat(value)}{'â˜†'.repeat(5 - value)}</option>)}
+              {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5 - value)}</option>)}
             </select>
-            <button className="primaryButton" type="submit" disabled={!canEdit || searching || !query.trim()}>{searching ? 'Searchingâ€¦' : 'Search Google'}</button>
+            <button className="primaryButton" type="submit" disabled={!canEdit || searching || !query.trim()}>{searching ? 'Searching…' : 'Search Google'}</button>
           </div>
           <button className="secondaryButton" type="button" disabled={!canEdit || !query.trim()} onClick={() => void persistPlace(null)}>Add manually without map location</button>
         </form>
@@ -704,7 +688,7 @@ export function TripWorkspace({
         {results.length > 0 && <div className="searchResults" aria-label="Google Places search results">
           <div className="resultsLabel">Google Places results</div>
           {results.map((result) => <button type="button" className="searchResult" key={result.providerPlaceId} onClick={() => void persistPlace(result)}>
-            <span className="resultPin">ðŸ“</span>
+            <span className="resultPin">📍</span>
             <span className="resultText"><strong>{result.name}</strong><small>{result.formattedAddress || 'Address unavailable'}</small></span>
             <span className="addResult">Add</span>
           </button>)}
@@ -722,7 +706,7 @@ export function TripWorkspace({
             <div className="placeCardTop">
               <button type="button" className="placeSelect" onClick={() => selectPlace(place.id)}>
                 <span className="placeOrderBadge" aria-label={`Stop ${placeIndex + 1}`}>{placeIndex + 1}</span>
-                <span className="placeCategoryIcon">{categoryIcons[place.category] ?? 'ðŸ“'}</span>
+                <span className="placeCategoryIcon">{categoryIcons[place.category] ?? '📍'}</span>
                 <span><strong>{place.name}</strong>{place.formattedAddress && <small>{place.formattedAddress}</small>}</span>
               </button>
               {canEdit && <button type="button" className="deleteButton" onClick={(event) => { event.stopPropagation(); void deletePlace(place.id); }} aria-label={`Delete ${place.name}`}>Delete</button>}
@@ -746,7 +730,7 @@ export function TripWorkspace({
                   aria-label={`Move ${place.name} to day`}
                 >
                   <option value="">Unplanned</option>
-                  {days.map((value) => <option key={value.id} value={value.id}>{value.title}{value.date ? ` Â· ${value.date}` : ''}</option>)}
+                  {days.map((value) => <option key={value.id} value={value.id}>{value.title}{value.date ? ` · ${value.date}` : ''}</option>)}
                 </select>
               </label>
 
@@ -759,7 +743,7 @@ export function TripWorkspace({
                   onChange={(event) => void updatePlaceDetails(place.id, { category: event.target.value })}
                   aria-label={`Change ${place.name} category`}
                 >
-                  {categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? 'ðŸ“'} {value}</option>)}
+                  {categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? '📍'} {value}</option>)}
                 </select>
               </label>
 
@@ -772,7 +756,7 @@ export function TripWorkspace({
                   onChange={(event) => void updatePlaceDetails(place.id, { priority: Number(event.target.value) })}
                   aria-label={`Change your rating for ${place.name}`}
                 >
-                  {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{'â˜…'.repeat(value)}{'â˜†'.repeat(5 - value)}</option>)}
+                  {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5 - value)}</option>)}
                 </select>
               </label>
 
@@ -801,7 +785,7 @@ export function TripWorkspace({
                     onClick={() => void reorderPlace(place.id, 'up')}
                     aria-label={`Move ${place.name} earlier`}
                     title="Move earlier"
-                  >â†‘</button>
+                  >↑</button>
                   <button
                     type="button"
                     className="orderButton"
@@ -809,7 +793,7 @@ export function TripWorkspace({
                     onClick={() => void reorderPlace(place.id, 'down')}
                     aria-label={`Move ${place.name} later`}
                     title="Move later"
-                  >â†“</button>
+                  >↓</button>
                 </div>
               </div>
               {place.latitude === null && <span className="unmappedBadge controlBadge">Unmapped</span>}
@@ -828,9 +812,9 @@ export function TripWorkspace({
           <label>
             <span>Route mode</span>
             <select value={routeMode} onChange={(event) => setRouteMode(event.target.value as RouteMode)}>
-              <option value="DRIVING">ðŸš— Drive</option>
-              <option value="TRANSIT">ðŸš† Transit</option>
-              <option value="WALKING">ðŸš¶ Walk</option>
+              <option value="DRIVING">🚗 Drive</option>
+              <option value="TRANSIT">🚆 Transit</option>
+              <option value="WALKING">🚶 Walk</option>
             </select>
           </label>
           <label className="trafficToggle">
@@ -845,18 +829,18 @@ export function TripWorkspace({
           <div className="routeContext">
             {routeEnabled
               ? <><strong>{filter === 'unplanned' ? 'Unplanned' : dayById.get(filter)?.title ?? 'Day'}</strong><small>Route follows the current stop order.</small></>
-              : <><strong>Select a day</strong><small>â€œAllâ€ view does not draw a multi-day route.</small></>}
+              : <><strong>Select a day</strong><small>“All” view does not draw a multi-day route.</small></>}
           </div>
         </div>
 
         {activeDay && <div className="dayRoutePlanner">
           <div className="dayRoutePlannerHeader">
             <div><strong>{activeDay.title} route plan</strong><small>Hotel endpoints, schedule and driving preferences are saved per day.</small></div>
-            <button className="secondaryButton compactButton" type="button" disabled={!canEdit || routeSettingsBusy} onClick={() => void saveRouteSettings()}>{routeSettingsBusy ? 'Savingâ€¦' : 'Save day route'}</button>
+            <button className="secondaryButton compactButton" type="button" disabled={!canEdit || routeSettingsBusy} onClick={() => void saveRouteSettings()}>{routeSettingsBusy ? 'Saving…' : 'Save day route'}</button>
           </div>
           <div className="dayRoutePlannerGrid">
-            <label><span>Start / lodging</span><select value={routeStartId} onChange={(e) => setRouteStartId(e.target.value)}><option value="">Use first itinerary stop</option>{hotelCandidates.map((item) => <option key={`start-${item.id}`} value={item.id}>{item.category === 'Hotel' ? 'ðŸ¨ ' : ''}{item.name}</option>)}</select></label>
-            <label><span>End / lodging</span><select value={routeEndId} onChange={(e) => setRouteEndId(e.target.value)}><option value="">Use last itinerary stop</option>{hotelCandidates.map((item) => <option key={`end-${item.id}`} value={item.id}>{item.category === 'Hotel' ? 'ðŸ¨ ' : ''}{item.name}</option>)}</select></label>
+            <label><span>Start / lodging</span><select value={routeStartId} onChange={(e) => setRouteStartId(e.target.value)}><option value="">Use first itinerary stop</option>{hotelCandidates.map((item) => <option key={`start-${item.id}`} value={item.id}>{item.category === 'Hotel' ? '🏨 ' : ''}{item.name}</option>)}</select></label>
+            <label><span>End / lodging</span><select value={routeEndId} onChange={(e) => setRouteEndId(e.target.value)}><option value="">Use last itinerary stop</option>{hotelCandidates.map((item) => <option key={`end-${item.id}`} value={item.id}>{item.category === 'Hotel' ? '🏨 ' : ''}{item.name}</option>)}</select></label>
             <label><span>Depart at</span><input type="time" value={routeDepartureTime} onChange={(e) => setRouteDepartureTime(e.target.value)} /></label>
             <label><span>Arrive by</span><input type="time" value={routeArrivalTime} onChange={(e) => setRouteArrivalTime(e.target.value)} /></label>
           </div>
@@ -864,11 +848,11 @@ export function TripWorkspace({
             <div className="routeTimeAnchor"><span>Routing time</span><label><input type="radio" name="routeTimeAnchor" checked={routeTimeAnchor === 'departure'} onChange={() => setRouteTimeAnchor('departure')} /> Depart at</label><label><input type="radio" name="routeTimeAnchor" checked={routeTimeAnchor === 'arrival'} onChange={() => setRouteTimeAnchor('arrival')} /> Arrive by</label></div>
             <label className="trafficToggle"><input type="checkbox" checked={avoidTolls} onChange={(e) => setAvoidTolls(e.target.checked)} /><span>Avoid tolls</span></label>
             <label className="trafficToggle"><input type="checkbox" checked={avoidHighways} onChange={(e) => setAvoidHighways(e.target.checked)} /><span>Avoid highways</span></label>
-            <button className="secondaryButton compactButton" type="button" disabled={!canEdit || optimizationBusy || routeMode === 'TRANSIT' || routePlaces.filter((item) => item.latitude !== null && item.longitude !== null).length < 3} onClick={requestOptimization}>{optimizationBusy ? 'Optimizingâ€¦' : 'Suggest best order'}</button>
+            <button className="secondaryButton compactButton" type="button" disabled={!canEdit || optimizationBusy || routeMode === 'TRANSIT' || routePlaces.filter((item) => item.latitude !== null && item.longitude !== null).length < 3} onClick={requestOptimization}>{optimizationBusy ? 'Optimizing…' : 'Suggest best order'}</button>
           </div>
           {optimizationError && <div className="routeHint routeHintError">{optimizationError}</div>}
           {optimizationSuggestion && <div className="optimizationSuggestion">
-            <div><span>Suggested route</span><strong>{optimizationSuggestion.distance} Â· {optimizationSuggestion.duration}</strong><small>Preview only â€” nothing changes until you accept it.</small></div>
+            <div><span>Suggested route</span><strong>{optimizationSuggestion.distance} · {optimizationSuggestion.duration}</strong><small>Preview only — nothing changes until you accept it.</small></div>
             <div className="optimizationOrder">{optimizationSuggestion.orderedPlaceIds.map((id, index) => <span key={`${id}-${index}`}>{index + 1}. {items.find((item) => item.id === id)?.name ?? 'Stop'}</span>)}</div>
             <div className="optimizationActions"><button className="secondaryButton compactButton" type="button" onClick={() => setOptimizationSuggestion(null)}>Keep current order</button><button className="primaryButton compactButton" type="button" disabled={optimizationBusy} onClick={() => void acceptOptimization()}>Accept suggested order</button></div>
           </div>}
@@ -902,10 +886,10 @@ export function TripWorkspace({
           <div className="routeSummaryTop">
             <div>
               <div className="selectedLabel">Live route</div>
-              <strong>{routeMode === 'DRIVING' ? 'ðŸš— Driving' : routeMode === 'TRANSIT' ? 'ðŸš† Transit' : 'ðŸš¶ Walking'}</strong>
+              <strong>{routeMode === 'DRIVING' ? '🚗 Driving' : routeMode === 'TRANSIT' ? '🚆 Transit' : '🚶 Walking'}</strong>
             </div>
             {routeSummary.state === 'loading'
-              ? <span className="routeStatus">Calculatingâ€¦</span>
+              ? <span className="routeStatus">Calculating…</span>
               : routeSummary.state === 'ready'
                 ? <span className="routeStatus ready">Updated</span>
                 : routeSummary.state === 'error'
@@ -915,7 +899,7 @@ export function TripWorkspace({
 
           {!routeEnabled && <div className="routeHint">Choose Day 1 / Day 2 / Unplanned to calculate a route for that group.</div>}
           {routeEnabled && mappedCount < visible.length && <div className="routeHint">{visible.length - mappedCount} unmapped stop{visible.length - mappedCount === 1 ? '' : 's'} will be skipped until a map location is attached.</div>}
-          {routeEnabled && routeMode === 'TRANSIT' && <div className="routeHint">Transit uses Googleâ€™s current/default departure-time context until NekoTrip stores a departure time for the day.</div>}
+          {routeEnabled && routeMode === 'TRANSIT' && <div className="routeHint">Transit uses Google’s current/default departure-time context until NekoTrip stores a departure time for the day.</div>}
           {routeEnabled && routeSummary.error && <div className="routeHint routeHintError">{routeSummary.error}</div>}
           {routeEnabled && routeSummary.state === 'ready' && <>
             <div className="routeTotals">
@@ -928,7 +912,7 @@ export function TripWorkspace({
               <div><span>Planned departure</span><strong>{formatClock(plannedDeparture)}</strong></div>
               <div><span>{routeTimeAnchor === 'arrival' ? 'Estimated departure' : 'Estimated arrival'}</span><strong>{routeTimeAnchor === 'arrival' ? formatClock(calculatedDeparture) : formatClock(calculatedArrival)}</strong></div>
               <div><span>Arrive by</span><strong>{formatClock(plannedArrival)}</strong></div>
-              <div><span>Day total</span><strong>{Math.floor(dayDurationMillis / 3600000) > 0 ? `${Math.floor(dayDurationMillis / 3600000)} hr ` : ''}{Math.round((dayDurationMillis % 3600000) / 60000)} min Â· {routeSummary.distance}</strong><small>{routeSummary.duration} travel + {routeStayMinutes} min stops</small></div>
+              <div><span>Day total</span><strong>{Math.floor(dayDurationMillis / 3600000) > 0 ? `${Math.floor(dayDurationMillis / 3600000)} hr ` : ''}{Math.round((dayDurationMillis % 3600000) / 60000)} min · {routeSummary.distance}</strong><small>{routeSummary.duration} travel + {routeStayMinutes} min stops</small></div>
             </div>}
             {routeSummary.legs.length > 0 && <div className="routeLegs">
               {routeSummary.legs.map((leg, index) => {
@@ -936,18 +920,18 @@ export function TripWorkspace({
                 return <div className="routeLeg" key={`${leg.from}-${leg.to}-${index}`}>
                   <span className="routeLegNumber">{index + 1}</span>
                   <div>
-                    <strong>{leg.from} â†’ {leg.to}</strong>
-                    <small>{leg.distance} Â· {leg.duration}</small>
+                    <strong>{leg.from} → {leg.to}</strong>
+                    <small>{leg.distance} · {leg.duration}</small>
                     {schedule && <div className="routeStopTiming">
                       <span><b>{formatClock(schedule.arrival)}</b> arrival</span>
-                      {schedule.stayMinutes > 0 && <span>{schedule.stayMinutes} min stay Â· depart {formatClock(schedule.departure)}</span>}
+                      {schedule.stayMinutes > 0 && <span>{schedule.stayMinutes} min stay · depart {formatClock(schedule.departure)}</span>}
                     </div>}
                   </div>
                 </div>;
               })}
             </div>}
             {routeSummary.warnings.length > 0 && <div className="routeWarnings">
-              {routeSummary.warnings.map((warning, index) => <small key={`${warning}-${index}`}>âš ï¸ {warning}</small>)}
+              {routeSummary.warnings.map((warning, index) => <small key={`${warning}-${index}`}>⚠️ {warning}</small>)}
             </div>}
           </>}
         </div>
@@ -955,9 +939,9 @@ export function TripWorkspace({
         <div className="selectedPanel">
           {selected ? <>
             <div className="selectedLabel">Selected place</div>
-            <strong>{categoryIcons[selected.category] ?? 'ðŸ“'} {selected.name}</strong>
+            <strong>{categoryIcons[selected.category] ?? '📍'} {selected.name}</strong>
             <small>{selected.formattedAddress || 'No mapped address yet'}</small>
-            <div className="selectedMeta">{selected.dayId ? dayById.get(selected.dayId)?.title ?? 'Day' : 'Unplanned'} Â· {selected.category} Â· {'â˜…'.repeat(selected.priority)}{'â˜†'.repeat(5 - selected.priority)}</div>
+            <div className="selectedMeta">{selected.dayId ? dayById.get(selected.dayId)?.title ?? 'Day' : 'Unplanned'} · {selected.category} · {'★'.repeat(selected.priority)}{'☆'.repeat(5 - selected.priority)}</div>
             {selected.providerPlaceId && <code className="placeId">Google Place ID: {selected.providerPlaceId}</code>}
           </> : <><div className="selectedLabel">Selected place</div><span className="muted">Choose a place card or marker.</span></>}
         </div>
@@ -966,4 +950,3 @@ export function TripWorkspace({
     <footer className="tripFooter">Trip slug: <code>{tripSlug}</code></footer>
   </main>;
 }
-
