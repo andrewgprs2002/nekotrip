@@ -94,7 +94,7 @@ export function LoginForm({ nextPath = '/' }: { nextPath?: string }) {
     </label>
 
     <label>
-      <span>6-digit verification code</span>
+      <span>Verification code</span>
       <input
         type="text"
         inputMode="numeric"
@@ -128,3 +128,4 @@ export function LoginForm({ nextPath = '/' }: { nextPath?: string }) {
     {message && <div className="statusMessage" role="status">{message}</div>}
   </form>;
 }
+
