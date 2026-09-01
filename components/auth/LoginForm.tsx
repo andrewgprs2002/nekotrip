@@ -7,37 +7,124 @@ export function LoginForm({ nextPath = '/' }: { nextPath?: string }) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!email.trim()) return;
+
     setBusy(true);
     setMessage('');
+
     try {
       const supabase = createClient();
-      const callback = new URL('/auth/callback', window.location.origin);
-      callback.searchParams.set('next', nextPath.startsWith('/') ? nextPath : '/');
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          emailRedirectTo: callback.toString(),
           shouldCreateUser: true,
         },
       });
+
       if (error) throw error;
-      setMessage('Magic link sent. Open the email on this same browser/device to sign in.');
+
+      setCode('');
+      setCodeSent(true);
+      setMessage('Verification code sent. Check your email and enter the 6-digit code below.');
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'Unable to send sign-in email.');
+      setMessage(cause instanceof Error ? cause.message : 'Unable to send verification code.');
     } finally {
       setBusy(false);
     }
   }
 
-  return <form className="authForm" onSubmit={submit}>
+  async function verifyCode(event: React.FormEvent) {
+    event.preventDefault();
+
+    const cleanEmail = email.trim();
+    const cleanCode = code.replace(/\D/g, '');
+
+    if (!cleanEmail || cleanCode.length !== 6) return;
+
+    setBusy(true);
+    setMessage('');
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.verifyOtp({
+        email: cleanEmail,
+        token: cleanCode,
+        type: 'email',
+      });
+
+      if (error) throw error;
+
+      const destination = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/';
+      window.location.assign(destination);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Unable to verify code.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!codeSent) {
+    return <form className="authForm" onSubmit={submit}>
+      <label>
+        <span>Email</span>
+        <input
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="you@example.com"
+        />
+      </label>
+      <button className="primaryButton" type="submit" disabled={busy || !email.trim()}>
+        {busy ? 'Sending…' : 'Email me a verification code'}
+      </button>
+      {message && <div className="statusMessage" role="status">{message}</div>}
+    </form>;
+  }
+
+  return <form className="authForm" onSubmit={verifyCode}>
     <label>
       <span>Email</span>
-      <input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+      <input type="email" value={email} disabled />
     </label>
-    <button className="primaryButton" type="submit" disabled={busy || !email.trim()}>{busy ? 'Sending…' : 'Email me a magic link'}</button>
+
+    <label>
+      <span>6-digit verification code</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        required
+        value={code}
+        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+        placeholder="123456"
+        autoFocus
+      />
+    </label>
+
+    <button className="primaryButton" type="submit" disabled={busy || code.length !== 6}>
+      {busy ? 'Verifying…' : 'Sign in'}
+    </button>
+
+    <button
+      className="secondaryButton"
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        setCode('');
+        setCodeSent(false);
+        setMessage('');
+      }}
+    >
+      Use a different email
+    </button>
+
     {message && <div className="statusMessage" role="status">{message}</div>}
   </form>;
 }
