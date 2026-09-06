@@ -1370,3 +1370,21 @@ button.wishlistRankingRow:hover {
   cursor: default;
   text-decoration: none;
 }
+
+/* v0.8.4.2 Trip desktop layout hotfix */
+@media (min-width: 1121px) {
+  .workspaceGrid > .itineraryPanel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .workspaceGrid > .mapPanel {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .workspaceGrid > .tripExpensesPanel {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
