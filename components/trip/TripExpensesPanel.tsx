@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { TripPlaceItem } from '@/lib/domain/types';
+import { EmojiPicker, insertEmojiAtSelection } from '@/components/common/EmojiPicker';
 
 type MemberRole = 'owner' | 'editor' | 'viewer';
 type SplitMode = 'equal' | 'manual';
@@ -63,6 +64,7 @@ export function TripExpensesPanel({ tripId, items, canEdit }: TripExpensesPanelP
   const [currency, setCurrency] = useState('JPY');
   const [splitMode, setSplitMode] = useState<SplitMode>('equal');
   const [note, setNote] = useState('');
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [draftShares, setDraftShares] = useState<ExpenseShare[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -319,7 +321,27 @@ export function TripExpensesPanel({ tripId, items, canEdit }: TripExpensesPanelP
         <label><span>Total cost</span><input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
         <label><span>Currency</span><input value={currency} maxLength={3} onChange={(event) => setCurrency(event.target.value.toUpperCase())} placeholder="JPY" /></label>
         <label><span>Split</span><select value={splitMode} onChange={(event) => setSplitMode(event.target.value as SplitMode)}><option value="equal">Equal split</option><option value="manual">Manual amounts</option></select></label>
-        <label className="tripExpenseNoteField"><span>Note</span><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Tickets, hotel deposit, dinner…" /></label>
+        <div className="tripExpenseNoteField">
+          <span>Note</span>
+          <textarea
+            ref={noteTextareaRef}
+            value={note}
+            maxLength={500}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="Tickets, hotel deposit, dinner…"
+          />
+          <EmojiPicker
+            disabled={!canEdit}
+            onPick={(emoji) => {
+              const { nextText, nextCursor } = insertEmojiAtSelection(noteTextareaRef.current, note, emoji, 500);
+              setNote(nextText);
+              window.requestAnimationFrame(() => {
+                noteTextareaRef.current?.focus();
+                noteTextareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+              });
+            }}
+          />
+        </div>
       </div>
 
       <div className="tripExpenseShareTable">

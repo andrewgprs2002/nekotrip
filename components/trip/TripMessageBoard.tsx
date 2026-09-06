@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { TripRole } from '@/lib/domain/types';
+import { EmojiPicker, insertEmojiAtSelection } from '@/components/common/EmojiPicker';
 
 interface TripMessage {
   id: string;
@@ -48,6 +49,7 @@ export function TripMessageBoard({
 }: TripMessageBoardProps) {
   const supabase = useMemo(() => createClient(), []);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const draftTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const firstLoadRef = useRef(true);
 
   const [messages, setMessages] = useState<TripMessage[]>([]);
@@ -227,6 +229,7 @@ export function TripMessageBoard({
       {canPost ? (
         <div className="tripMessageComposer">
           <textarea
+            ref={draftTextareaRef}
             value={draft}
             maxLength={2000}
             placeholder="Leave a note for this Trip…"
@@ -240,6 +243,21 @@ export function TripMessageBoard({
                 event.preventDefault();
                 void postMessage();
               }
+            }}
+          />
+          <EmojiPicker
+            onPick={(emoji) => {
+              const { nextText, nextCursor } = insertEmojiAtSelection(
+                draftTextareaRef.current,
+                draft,
+                emoji,
+                2000
+              );
+              setDraft(nextText);
+              window.requestAnimationFrame(() => {
+                draftTextareaRef.current?.focus();
+                draftTextareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+              });
             }}
           />
           <div className="tripMessageComposerFooter">
