@@ -81,10 +81,15 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
   const [emojiPickerItemId, setEmojiPickerItemId] = useState<string | null>(null);
   const [emojiGroup, setEmojiGroup] = useState<(typeof noteEmojiGroups)[number]['label']>('Mood');
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
-  const [shareTripId, setShareTripId] = useState('');
   const [shareName, setShareName] = useState('Japan Wishlist');
-  const [shareMoveExisting, setShareMoveExisting] = useState(false);
+  const [shareCopyExisting, setShareCopyExisting] = useState(true);
+  const [shareInviteEmail, setShareInviteEmail] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
+  const [memberEmail, setMemberEmail] = useState('');
+  const [memberBusy, setMemberBusy] = useState(false);
+  const [members, setMembers] = useState<Array<{ userId: string; email: string; role: 'owner' | 'editor' | 'viewer' }>>([]);
+  const [membersBusy, setMembersBusy] = useState(false);
+
 
   const activeSpace = spaces.find((space) => space.id === activeSpaceId) ?? null;
   const canEditWishlist = activeSpace === null || activeSpace.role === 'owner' || activeSpace.role === 'editor';
@@ -197,31 +202,115 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     setActiveSpaceId(nextSpaceId);
     try {
       await refresh(nextSpaceId);
+      await refreshSharedMembers(nextSpaceId);
     } catch (cause) {
       setMessage(errorMessage(cause, 'Unable to load this Wishlist.'));
     }
   };
 
-  const createSharedWishlist = async () => {
-    if (!shareTripId || !shareName.trim()) return;
-    setShareBusy(true); setMessage('');
+  const refreshSharedMembers = async (spaceId: string | null = activeSpaceId) => {
+    if (!spaceId) {
+      setMembers([]);
+      return;
+    }
+
+    setMembersBusy(true);
     try {
-      const { data, error } = await supabaseRef.current!.rpc('create_shared_wishlist_for_trip', {
-        p_trip_id: shareTripId,
-        p_name: shareName.trim(),
-        p_move_my_existing: shareMoveExisting,
+      const { data, error } = await supabaseRef.current!.rpc('list_wishlist_space_members', {
+        p_space_id: spaceId,
       });
       if (error) throw error;
+
+      const nextMembers = Array.isArray(data)
+        ? data.map((row: any) => ({
+            userId: row.user_id as string,
+            email: (row.email ?? 'Unknown user') as string,
+            role: row.role as 'owner' | 'editor' | 'viewer',
+          }))
+        : [];
+      setMembers(nextMembers);
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to load Shared Wishlist members.'));
+    } finally {
+      setMembersBusy(false);
+    }
+  };
+
+  const removeSharedWishlistMember = async (targetUserId: string) => {
+    if (!activeSpaceId || activeSpace?.role !== 'owner') return;
+    setMemberBusy(true); setMessage('');
+    try {
+      const { error } = await supabaseRef.current!.rpc('remove_wishlist_space_member', {
+        p_space_id: activeSpaceId,
+        p_user_id: targetUserId,
+      });
+      if (error) throw error;
+      await refreshSharedMembers(activeSpaceId);
+      setMessage('Collaborator removed from this Shared Wishlist.');
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to remove collaborator.'));
+    } finally {
+      setMemberBusy(false);
+    }
+  };
+
+  const createSharedWishlist = async () => {
+    if (!shareName.trim()) return;
+    setShareBusy(true); setMessage('');
+    try {
+      const { data, error } = await supabaseRef.current!.rpc('create_shared_wishlist', {
+        p_name: shareName.trim(),
+        p_copy_my_existing: shareCopyExisting,
+      });
+      if (error) throw error;
+
       const newSpaceId = typeof data === 'string' ? data : null;
+      if (!newSpaceId) throw new Error('Shared Wishlist was created but no collection id was returned.');
+
+      const inviteEmail = shareInviteEmail.trim();
+      if (inviteEmail) {
+        const { error: inviteError } = await supabaseRef.current!.rpc('add_wishlist_space_member_by_email', {
+          p_space_id: newSpaceId,
+          p_email: inviteEmail,
+          p_role: 'editor',
+        });
+        if (inviteError) throw inviteError;
+      }
+
       const nextSpaces = await loadWishlistSpaces(supabaseRef.current!, userId);
       setSpaces(nextSpaces);
-      if (newSpaceId) await switchWishlist(newSpaceId);
-      setShareMoveExisting(false);
-      setMessage('Shared Wishlist created. Trip collaborators can now use the same Wishlist.');
+      await switchWishlist(newSpaceId);
+      await refreshSharedMembers(newSpaceId);
+      setShareInviteEmail('');
+      setMessage(
+        inviteEmail
+          ? 'Shared Wishlist created and collaborator added.'
+          : 'Shared Wishlist created. You can add a collaborator by email below.'
+      );
     } catch (cause) {
       setMessage(errorMessage(cause, 'Unable to create shared Wishlist.'));
     } finally {
       setShareBusy(false);
+    }
+  };
+
+  const addSharedWishlistMember = async () => {
+    if (!activeSpaceId || !memberEmail.trim() || activeSpace?.role !== 'owner') return;
+    setMemberBusy(true); setMessage('');
+    try {
+      const { error } = await supabaseRef.current!.rpc('add_wishlist_space_member_by_email', {
+        p_space_id: activeSpaceId,
+        p_email: memberEmail.trim(),
+        p_role: 'editor',
+      });
+      if (error) throw error;
+      setMemberEmail('');
+      await refreshSharedMembers(activeSpaceId);
+      setMessage('Collaborator added to this Shared Wishlist.');
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to add collaborator.'));
+    } finally {
+      setMemberBusy(false);
     }
   };
 
@@ -464,22 +553,78 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
           <button className="primaryButton" type="button" disabled={!canEditWishlist || folderBusy || !newFolderName.trim()} onClick={() => void createFolder()}>{folderBusy ? 'Creating…' : '+ Create folder'}</button>
         </div>
 
-        <div className="folderCreator">
-          <strong>Share a Wishlist</strong>
-          <small>Create one from an existing Trip. Its collaborators become Wishlist members.</small>
-          <select value={shareTripId} onChange={(event) => setShareTripId(event.target.value)}>
-            <option value="">Choose Trip…</option>
-            {trips.map((trip) => <option key={`share-${trip.id}`} value={trip.id}>{trip.name}</option>)}
-          </select>
-          <input value={shareName} onChange={(event) => setShareName(event.target.value)} placeholder="Shared Wishlist name" maxLength={120} />
+        {activeSpace === null && <div className="folderCreator">
+          <strong>Create shared copy</strong>
+          <small>Create a Shared Wishlist directly from My Wishlist. Only explicitly added members can access it.</small>
+          <input
+            value={shareName}
+            onChange={(event) => setShareName(event.target.value)}
+            placeholder="Shared Wishlist name"
+            maxLength={120}
+          />
           <label className="trafficToggle">
-            <input type="checkbox" checked={shareMoveExisting} onChange={(event) => setShareMoveExisting(event.target.checked)} />
-            <span>Move my current private Wishlist into it</span>
+            <input
+              type="checkbox"
+              checked={shareCopyExisting}
+              onChange={(event) => setShareCopyExisting(event.target.checked)}
+            />
+            <span>Copy my current private folders, places and notes</span>
           </label>
-          <button className="primaryButton" type="button" disabled={shareBusy || !shareTripId || !shareName.trim()} onClick={() => void createSharedWishlist()}>
-            {shareBusy ? 'Creating…' : 'Create shared Wishlist'}
+          <input
+            type="email"
+            value={shareInviteEmail}
+            onChange={(event) => setShareInviteEmail(event.target.value)}
+            placeholder="Collaborator email (optional — only this user is added)"
+            autoComplete="email"
+          />
+          <button
+            className="primaryButton"
+            type="button"
+            disabled={shareBusy || !shareName.trim()}
+            onClick={() => void createSharedWishlist()}
+          >
+            {shareBusy ? 'Creating…' : 'Create shared copy'}
           </button>
-        </div>
+        </div>}
+
+        {activeSpace?.role === 'owner' && <div className="folderCreator">
+          <strong>Collaborators</strong>
+          <small>Only explicitly listed users can access this Shared Wishlist. Other site testers and Trip members are not added automatically.</small>
+
+          <div className="folderTree">
+            {membersBusy && <span className="muted">Loading members…</span>}
+            {!membersBusy && members.map((member) => <div className="folderRow" key={member.userId}>
+              <div className="folderMain">
+                <span>{member.email}</span>
+                <small>{member.role}</small>
+              </div>
+              {member.role !== 'owner' && <button
+                className="folderMiniAction danger"
+                type="button"
+                disabled={memberBusy}
+                onClick={() => void removeSharedWishlistMember(member.userId)}
+              >
+                Remove
+              </button>}
+            </div>)}
+          </div>
+
+          <input
+            type="email"
+            value={memberEmail}
+            onChange={(event) => setMemberEmail(event.target.value)}
+            placeholder="friend@example.com"
+            autoComplete="email"
+          />
+          <button
+            className="secondaryButton"
+            type="button"
+            disabled={memberBusy || !memberEmail.trim()}
+            onClick={() => void addSharedWishlistMember()}
+          >
+            {memberBusy ? 'Adding…' : 'Add collaborator'}
+          </button>
+        </div>}
       </aside>
 
       <section className="panel wishlistListPanel">
