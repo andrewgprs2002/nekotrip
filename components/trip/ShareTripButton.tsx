@@ -26,12 +26,12 @@ export function ShareTripButton({ tripId, userId, canInvite }: { tripId: string;
       if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(inviteUrl);
-          setMessage('One-time editor invite copied. It expires in 7 days.');
+          setMessage('One-time editor invite copied. The invite does not expire; editor access remains until the owner removes it.');
         } catch {
-          setMessage('Invite created. Copy the link below.');
+          setMessage('Invite created. It does not expire. Copy the link below.');
         }
       } else {
-        setMessage('Invite created. Copy the link below.');
+        setMessage('Invite created. It does not expire. Copy the link below.');
       }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Unable to create invitation.');
