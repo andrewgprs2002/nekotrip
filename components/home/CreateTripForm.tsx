@@ -24,7 +24,7 @@ export function CreateTripForm() {
         p_timezone: 'Asia/Tokyo',
         p_start_date: startDate || null,
         p_end_date: endDate || null,
-        p_default_days: 4,
+        p_default_days: 1,
       });
       if (error) throw error;
       const created = Array.isArray(data) ? data[0] : data;

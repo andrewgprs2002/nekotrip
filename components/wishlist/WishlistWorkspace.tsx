@@ -674,7 +674,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
         p_timezone: 'Asia/Tokyo',
         p_start_date: newTripStartDate || null,
         p_end_date: newTripEndDate || null,
-        p_default_days: 4,
+        p_default_days: 1,
       });
       if (error) throw error;
       const created = Array.isArray(data) ? data[0] : data;
