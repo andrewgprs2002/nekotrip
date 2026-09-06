@@ -1315,3 +1315,58 @@ button.wishlistRankingRow:hover {
     grid-column: auto;
   }
 }
+
+
+/* v0.8.4.1 Shared Wishlist collaborator identity layout */
+.wishlistMemberRow {
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.wishlistMemberRow:last-child {
+  border-bottom: 0;
+}
+
+.wishlistMemberIdentity {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+}
+
+.wishlistMemberRole {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wishlistMemberEmail {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.wishlistMemberRemove {
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wishlistMemberRemove:hover {
+  text-decoration: underline;
+}
+
+.wishlistMemberRemove:disabled {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: none;
+}

@@ -800,19 +800,19 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
 
           <div className="folderTree">
             {membersBusy && <span className="muted">Loading members…</span>}
-            {!membersBusy && members.map((member) => <div className="folderRow" key={member.userId}>
-              <div className="folderMain">
-                <span>{member.email}</span>
-                <small>{member.role}</small>
+            {!membersBusy && members.map((member) => <div className="wishlistMemberRow" key={member.userId}>
+              <div className="wishlistMemberIdentity">
+                <small className="wishlistMemberRole">{member.role}</small>
+                <span className="wishlistMemberEmail">{member.email}</span>
+                {member.role !== 'owner' && <button
+                  className="wishlistMemberRemove"
+                  type="button"
+                  disabled={memberBusy}
+                  onClick={() => void removeSharedWishlistMember(member.userId)}
+                >
+                  Remove
+                </button>}
               </div>
-              {member.role !== 'owner' && <button
-                className="folderMiniAction danger"
-                type="button"
-                disabled={memberBusy}
-                onClick={() => void removeSharedWishlistMember(member.userId)}
-              >
-                Remove
-              </button>}
             </div>)}
           </div>
 
