@@ -26,6 +26,21 @@ const noteEmojiGroups = [
 
 type FolderScope = 'all' | 'unfiled' | string;
 type CreateTripMode = null | 'create';
+type SharedRatingSort = 'folder' | 'average' | 'consensus';
+
+interface SharedRatingRow {
+  itemId: string;
+  userId: string;
+  email: string;
+  role: 'owner' | 'editor';
+  rating: number;
+}
+
+interface SharedRatingSummary {
+  average: number | null;
+  count: number;
+  disagreement: number;
+}
 
 interface Props {
   userId: string;
@@ -89,10 +104,50 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
   const [memberBusy, setMemberBusy] = useState(false);
   const [members, setMembers] = useState<Array<{ userId: string; email: string; role: 'owner' | 'editor' | 'viewer' }>>([]);
   const [membersBusy, setMembersBusy] = useState(false);
+  const [sharedRatings, setSharedRatings] = useState<SharedRatingRow[]>([]);
+  const [sharedRatingBusyId, setSharedRatingBusyId] = useState<string | null>(null);
+  const [sharedRatingSort, setSharedRatingSort] = useState<SharedRatingSort>('consensus');
 
 
   const activeSpace = spaces.find((space) => space.id === activeSpaceId) ?? null;
   const canEditWishlist = activeSpace === null || activeSpace.role === 'owner' || activeSpace.role === 'editor';
+
+  const ratingsByItem = useMemo(() => {
+    const map = new Map<string, SharedRatingRow[]>();
+    for (const row of sharedRatings) {
+      const list = map.get(row.itemId) ?? [];
+      list.push(row);
+      map.set(row.itemId, list);
+    }
+    return map;
+  }, [sharedRatings]);
+
+  const ratingSummaries = useMemo(() => {
+    const map = new Map<string, SharedRatingSummary>();
+    for (const [itemId, rows] of ratingsByItem.entries()) {
+      const values = rows.map((row) => row.rating);
+      if (values.length === 0) {
+        map.set(itemId, { average: null, count: 0, disagreement: 0 });
+        continue;
+      }
+      const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+      const variance = values.reduce((sum, value) => sum + Math.pow(value - average, 2), 0) / values.length;
+      map.set(itemId, {
+        average,
+        count: values.length,
+        disagreement: Math.sqrt(variance),
+      });
+    }
+    return map;
+  }, [ratingsByItem]);
+
+  const currentUserRatings = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of sharedRatings) {
+      if (row.userId === userId) map.set(row.itemId, row.rating);
+    }
+    return map;
+  }, [sharedRatings, userId]);
 
 
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
@@ -154,6 +209,55 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     return items.filter((item) => item.folderId !== null && descendantIds.has(item.folderId));
   }, [descendantIds, items, scope]);
 
+  const sortedVisible = useMemo(() => {
+    if (!activeSpace || sharedRatingSort === 'folder') return visible;
+
+    const next = [...visible];
+    next.sort((a, b) => {
+      const aSummary = ratingSummaries.get(a.id) ?? { average: null, count: 0, disagreement: 0 };
+      const bSummary = ratingSummaries.get(b.id) ?? { average: null, count: 0, disagreement: 0 };
+
+      if (aSummary.average === null && bSummary.average !== null) return 1;
+      if (aSummary.average !== null && bSummary.average === null) return -1;
+      if (aSummary.average === null && bSummary.average === null) return a.name.localeCompare(b.name);
+
+      const averageDiff = (bSummary.average ?? 0) - (aSummary.average ?? 0);
+      if (Math.abs(averageDiff) > 0.0001) return averageDiff;
+
+      if (sharedRatingSort === 'consensus') {
+        const countDiff = bSummary.count - aSummary.count;
+        if (countDiff !== 0) return countDiff;
+
+        const disagreementDiff = aSummary.disagreement - bSummary.disagreement;
+        if (Math.abs(disagreementDiff) > 0.0001) return disagreementDiff;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+    return next;
+  }, [activeSpace, ratingSummaries, sharedRatingSort, visible]);
+
+  const rankedVisible = useMemo(
+    () => [...visible].sort((a, b) => {
+      const aSummary = ratingSummaries.get(a.id) ?? { average: null, count: 0, disagreement: 0 };
+      const bSummary = ratingSummaries.get(b.id) ?? { average: null, count: 0, disagreement: 0 };
+
+      if (aSummary.average === null && bSummary.average !== null) return 1;
+      if (aSummary.average !== null && bSummary.average === null) return -1;
+      if (aSummary.average === null && bSummary.average === null) return a.name.localeCompare(b.name);
+
+      const averageDiff = (bSummary.average ?? 0) - (aSummary.average ?? 0);
+      if (Math.abs(averageDiff) > 0.0001) return averageDiff;
+      const countDiff = bSummary.count - aSummary.count;
+      if (countDiff !== 0) return countDiff;
+      const disagreementDiff = aSummary.disagreement - bSummary.disagreement;
+      if (Math.abs(disagreementDiff) > 0.0001) return disagreementDiff;
+      return a.name.localeCompare(b.name);
+    }),
+    [ratingSummaries, visible]
+  );
+
   const insertNoteEmoji = (itemId: string, emoji: string) => {
     const textarea = noteTextareaRefs.current[itemId];
     const currentText = noteDrafts[itemId] ?? '';
@@ -192,6 +296,48 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     });
   };
 
+  const refreshSharedRatings = async (spaceId: string | null = activeSpaceId) => {
+    if (!spaceId) {
+      setSharedRatings([]);
+      return;
+    }
+
+    const { data, error } = await supabaseRef.current!.rpc('list_wishlist_item_ratings', {
+      p_space_id: spaceId,
+    });
+    if (error) throw error;
+
+    const nextRatings = Array.isArray(data)
+      ? data.map((row: any) => ({
+          itemId: row.item_id as string,
+          userId: row.user_id as string,
+          email: (row.email ?? 'Unknown user') as string,
+          role: row.role as 'owner' | 'editor',
+          rating: Number(row.rating),
+        }))
+      : [];
+
+    setSharedRatings(nextRatings);
+  };
+
+  const setMySharedRating = async (item: WishlistItem, nextRating: number | null) => {
+    if (!activeSpaceId || !canEditWishlist) return;
+    setSharedRatingBusyId(item.id);
+    setMessage('');
+    try {
+      const { error } = await supabaseRef.current!.rpc('set_wishlist_item_rating', {
+        p_item_id: item.id,
+        p_rating: nextRating,
+      });
+      if (error) throw error;
+      await refreshSharedRatings(activeSpaceId);
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to save your rating.'));
+    } finally {
+      setSharedRatingBusyId(null);
+    }
+  };
+
   const switchWishlist = async (nextSpaceId: string | null) => {
     setMessage('');
     setScope('all');
@@ -202,7 +348,10 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     setActiveSpaceId(nextSpaceId);
     try {
       await refresh(nextSpaceId);
-      await refreshSharedMembers(nextSpaceId);
+      await Promise.all([
+        refreshSharedMembers(nextSpaceId),
+        refreshSharedRatings(nextSpaceId),
+      ]);
     } catch (cause) {
       setMessage(errorMessage(cause, 'Unable to load this Wishlist.'));
     }
@@ -359,7 +508,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     const name = result?.name ?? query.trim();
     if (!name) return;
     setMessage('');
-    const { error } = await supabaseRef.current!.rpc('add_wishlist_place_v2', {
+    const { data: savedItemId, error } = await supabaseRef.current!.rpc('add_wishlist_place_v2', {
       p_name: name,
       p_provider: result?.provider ?? 'manual',
       p_provider_place_id: result?.providerPlaceId ?? null,
@@ -372,8 +521,18 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
       p_space_id: activeSpaceId,
     });
     if (error) { setMessage(error.message); return; }
+
+    if (activeSpaceId && typeof savedItemId === 'string') {
+      const { error: ratingError } = await supabaseRef.current!.rpc('set_wishlist_item_rating', {
+        p_item_id: savedItemId,
+        p_rating: rating,
+      });
+      if (ratingError) { setMessage(ratingError.message); return; }
+    }
+
     setQuery(''); setResults([]);
     await refresh();
+    if (activeSpaceId) await refreshSharedRatings(activeSpaceId);
     setMessage(`Saved ${name} to ${activeSpace?.name ?? 'your personal Wishlist'}.`);
   };
 
@@ -531,7 +690,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
           <option value="">🔒 My Wishlist</option>
           {spaces.map((space) => <option key={space.id} value={space.id}>👥 {space.name}</option>)}
         </select>
-        <button className="secondaryButton compactButton" type="button" onClick={() => void refresh()}>Refresh</button>
+        <button className="secondaryButton compactButton" type="button" onClick={() => void Promise.all([refresh(), refreshSharedRatings()])}>Refresh</button>
         <Link className="secondaryLink" href="/">Trips</Link>
       </div>
     </header>
@@ -647,6 +806,54 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
 
         <div className="wishlistScopeTitle"><strong>{scope === 'all' ? 'All saved places' : scope === 'unfiled' ? 'Unfiled' : folderById.get(scope)?.name ?? 'Folder'}</strong><small>{visible.length} place{visible.length === 1 ? '' : 's'}</small></div>
 
+        {activeSpace && <section className="wishlistConsensusPanel">
+          <div className="wishlistConsensusHeader">
+            <div>
+              <strong>Consensus ranking</strong>
+              <small>Average first; ties favor more votes, then lower disagreement.</small>
+            </div>
+            <label className="compactField wishlistRatingSort">
+              <span>List order</span>
+              <select
+                className="inlineMetaSelect"
+                value={sharedRatingSort}
+                onChange={(event) => setSharedRatingSort(event.target.value as SharedRatingSort)}
+              >
+                <option value="consensus">Consensus</option>
+                <option value="average">Average</option>
+                <option value="folder">Folder order</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="wishlistRankingTable" role="table" aria-label="Shared Wishlist rating ranking">
+            <div className="wishlistRankingRow wishlistRankingHead" role="row">
+              <span role="columnheader">#</span>
+              <span role="columnheader">Place</span>
+              <span role="columnheader">Avg</span>
+              <span role="columnheader">Votes</span>
+              <span role="columnheader">Spread</span>
+            </div>
+            {rankedVisible.slice(0, 10).map((item, index) => {
+              const summary = ratingSummaries.get(item.id) ?? { average: null, count: 0, disagreement: 0 };
+              return <button
+                key={`rank-${item.id}`}
+                type="button"
+                className="wishlistRankingRow"
+                role="row"
+                onClick={() => setSelectedId(item.id)}
+              >
+                <span role="cell">{index + 1}</span>
+                <span role="cell" className="wishlistRankingName">{item.name}</span>
+                <strong role="cell">{summary.average === null ? '—' : summary.average.toFixed(2)}</strong>
+                <span role="cell">{summary.count}</span>
+                <span role="cell">{summary.count < 2 ? '—' : summary.disagreement.toFixed(2)}</span>
+              </button>;
+            })}
+            {rankedVisible.length === 0 && <div className="muted wishlistRankingEmpty">No places in this view yet.</div>}
+          </div>
+        </section>}
+
         <div className="wishlistBulkBar">
           <div className="wishlistBulkTop">
             <strong>{selectedCount > 0 ? `${selectedCount} selected` : 'Select places'}</strong>
@@ -669,7 +876,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
 
         <div className="placeList wishlistPlaceList">
           {visible.length === 0 && <div className="emptyState">Nothing saved in this view yet.</div>}
-          {visible.map((item) => {
+          {sortedVisible.map((item) => {
             const bulkSelected = selectedIds.has(item.id);
             return <article key={item.id} className={`${selectedId === item.id ? 'placeCard selected' : 'placeCard'}${bulkSelected ? ' bulkSelected' : ''}`} onClick={() => setSelectedId(item.id)}>
               <div className="placeCardTop">
@@ -714,8 +921,37 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
               <div className="wishlistItemControls" onClick={(event) => event.stopPropagation()}>
                 <label className="compactField"><span>Folder</span><select className="inlineMetaSelect" value={item.folderId ?? ''} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { folderId: event.target.value || null })}><option value="">Unfiled</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label>
                 <label className="compactField"><span>Type</span><select className="inlineMetaSelect" value={item.category} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { category: event.target.value })}>{categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? '📍'} {value}</option>)}</select></label>
-                <label className="compactField"><span>Stars</span><select className="inlineMetaSelect" value={item.rating} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}</select></label>
+                {activeSpace ? <label className="compactField">
+                  <span>Your Stars</span>
+                  <select
+                    className="inlineMetaSelect"
+                    value={currentUserRatings.get(item.id) ?? ''}
+                    disabled={!canEditWishlist || sharedRatingBusyId === item.id}
+                    onChange={(event) => void setMySharedRating(item, event.target.value ? Number(event.target.value) : null)}
+                  >
+                    <option value="">Not rated</option>
+                    {[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}
+                  </select>
+                </label> : <label className="compactField"><span>Stars</span><select className="inlineMetaSelect" value={item.rating} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}</select></label>}
               </div>
+              {activeSpace && (() => {
+                const rows = ratingsByItem.get(item.id) ?? [];
+                const summary = ratingSummaries.get(item.id) ?? { average: null, count: 0, disagreement: 0 };
+                return <div className="wishlistSharedRatingSummary" onClick={(event) => event.stopPropagation()}>
+                  <div className="wishlistAverageScore">
+                    <span>Average</span>
+                    <strong>{summary.average === null ? '—' : `${summary.average.toFixed(2)} / 5`}</strong>
+                    <small>{summary.count} rating{summary.count === 1 ? '' : 's'}{summary.count >= 2 ? ` · spread ${summary.disagreement.toFixed(2)}` : ''}</small>
+                  </div>
+                  <div className="wishlistMemberRatings">
+                    {rows.length === 0 && <span className="muted">No editor ratings yet.</span>}
+                    {rows.map((row) => <span key={`${item.id}-${row.userId}`} className="wishlistMemberRatingPill" title={row.email}>
+                      <span>{row.email.split('@')[0]}</span>
+                      <strong>{row.rating.toFixed(1)}</strong>
+                    </span>)}
+                  </div>
+                </div>;
+              })()}
               <div className="wishlistTripAction" onClick={(event) => event.stopPropagation()}>
                 <select value={tripTargets[item.id] ?? ''} onChange={(event) => setTripTargets((current) => ({ ...current, [item.id]: event.target.value }))}><option value="">Choose Trip…</option>{trips.map((trip) => <option key={trip.id} value={trip.id}>{trip.name}</option>)}</select>
                 <button className="secondaryButton" type="button" disabled={busyItemId === item.id || !tripTargets[item.id]} onClick={() => void addToTrip(item)}>Add to Trip</button>
@@ -728,7 +964,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
       <section className="panel mapPanel wishlistMapPanel">
         <div className="mapHeader"><div><strong>Wishlist Map</strong><small>The map follows the selected folder scope. Use Select mapped to grab every mapped place in the current view.</small></div><span>{mappedCount} mapped / {visible.length} visible</span></div>
         <GoogleTripMap apiKey={apiKey} mapId={mapId} places={visible} selectedId={selectedId} onSelect={setSelectedId} onViewportPlaceIdsChange={setViewportPlaceIds} />
-        <div className="selectedPanel">{selected ? <><div className="selectedLabel">Selected wish</div><strong>{categoryIcons[selected.category] ?? '📍'} {selected.name}</strong><small>{selected.formattedAddress ?? 'No mapped address'}</small><div className="selectedMeta">{selected.folderId ? folderById.get(selected.folderId)?.name ?? 'Folder' : 'Unfiled'} · {'★'.repeat(selected.rating)}{'☆'.repeat(5-selected.rating)}</div><button className="secondaryButton compactButton" type="button" onClick={() => toggleBulkSelection(selected.id)}>{selectedIds.has(selected.id) ? 'Remove from selection' : 'Add to selection'}</button></> : <><div className="selectedLabel">Selected wish</div><span className="muted">Choose a saved place or map marker.</span></>}</div>
+        <div className="selectedPanel">{selected ? <><div className="selectedLabel">Selected wish</div><strong>{categoryIcons[selected.category] ?? '📍'} {selected.name}</strong><small>{selected.formattedAddress ?? 'No mapped address'}</small><div className="selectedMeta">{selected.folderId ? folderById.get(selected.folderId)?.name ?? 'Folder' : 'Unfiled'} · {activeSpace ? (() => { const summary = ratingSummaries.get(selected.id); return summary?.average == null ? 'No ratings' : `Avg ${summary.average.toFixed(2)} / 5 (${summary.count})`; })() : <>{'★'.repeat(selected.rating)}{'☆'.repeat(5-selected.rating)}</>}</div><button className="secondaryButton compactButton" type="button" onClick={() => toggleBulkSelection(selected.id)}>{selectedIds.has(selected.id) ? 'Remove from selection' : 'Add to selection'}</button></> : <><div className="selectedLabel">Selected wish</div><span className="muted">Choose a saved place or map marker.</span></>}</div>
       </section>
     </div>
 
