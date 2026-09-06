@@ -58,9 +58,16 @@ export interface TripPlaceItem {
   priority: number;
 }
 
+export interface WishlistSpace {
+  id: string;
+  name: string;
+  role: 'owner' | 'editor' | 'viewer';
+}
+
 export interface WishlistFolder {
   id: string;
   userId: string;
+  spaceId: string | null;
   parentId: string | null;
   name: string;
   orderIndex: number;
@@ -69,6 +76,7 @@ export interface WishlistFolder {
 export interface WishlistItem {
   id: string;
   userId: string;
+  spaceId: string | null;
   placeId: string;
   folderId: string | null;
   category: string;

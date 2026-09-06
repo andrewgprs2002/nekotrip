@@ -7,8 +7,8 @@ import { GoogleTripMap } from '@/components/map/GoogleTripMap';
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
 import { createClient } from '@/lib/supabase/client';
-import { loadWishlistFolders, loadWishlistItems } from '@/lib/repositories/wishlist';
-import type { WishlistFolder, WishlistItem, WishlistTripOption } from '@/lib/domain/types';
+import { loadWishlistFolders, loadWishlistItems, loadWishlistSpaces } from '@/lib/repositories/wishlist';
+import type { WishlistFolder, WishlistItem, WishlistSpace, WishlistTripOption } from '@/lib/domain/types';
 
 const categories = ['Sightseeing', 'Restaurant', 'Cafe', 'Hotel', 'Onsen', 'Shopping', 'Station'];
 const categoryIcons: Record<string, string> = {
@@ -30,6 +30,7 @@ type CreateTripMode = null | 'create';
 interface Props {
   userId: string;
   userName: string;
+  initialSpaces: WishlistSpace[];
   initialFolders: WishlistFolder[];
   initialItems: WishlistItem[];
   trips: WishlistTripOption[];
@@ -40,7 +41,7 @@ function errorMessage(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback;
 }
 
-export function WishlistWorkspace({ userId, userName, initialFolders, initialItems, trips }: Props) {
+export function WishlistWorkspace({ userId, userName, initialSpaces, initialFolders, initialItems, trips }: Props) {
   const router = useRouter();
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? '';
@@ -49,6 +50,8 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
   const providerRef = useRef<GooglePlacesProvider | null>(null);
   if (apiKey && !providerRef.current) providerRef.current = new GooglePlacesProvider(apiKey);
 
+  const [spaces, setSpaces] = useState(initialSpaces);
+  const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
   const [folders, setFolders] = useState(initialFolders);
   const [items, setItems] = useState(initialItems);
   const [scope, setScope] = useState<FolderScope>('all');
@@ -78,6 +81,14 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
   const [emojiPickerItemId, setEmojiPickerItemId] = useState<string | null>(null);
   const [emojiGroup, setEmojiGroup] = useState<(typeof noteEmojiGroups)[number]['label']>('Mood');
   const noteTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const [shareTripId, setShareTripId] = useState('');
+  const [shareName, setShareName] = useState('Japan Wishlist');
+  const [shareMoveExisting, setShareMoveExisting] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+
+  const activeSpace = spaces.find((space) => space.id === activeSpaceId) ?? null;
+  const canEditWishlist = activeSpace === null || activeSpace.role === 'owner' || activeSpace.role === 'editor';
+
 
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const childrenByParent = useMemo(() => {
@@ -161,18 +172,57 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
   const mappedVisibleIds = useMemo(() => visible.filter((item) => item.latitude !== null && item.longitude !== null).map((item) => item.id), [visible]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
-  const refresh = async () => {
+  const refresh = async (targetSpaceId: string | null = activeSpaceId) => {
     const [nextFolders, nextItems] = await Promise.all([
-      loadWishlistFolders(supabaseRef.current!),
-      loadWishlistItems(supabaseRef.current!),
+      loadWishlistFolders(supabaseRef.current!, userId, targetSpaceId),
+      loadWishlistItems(supabaseRef.current!, userId, targetSpaceId),
     ]);
     setFolders(nextFolders);
     setItems(nextItems);
+    setNoteDrafts(Object.fromEntries(nextItems.map((item) => [item.id, item.notes ?? ''])));
     setSelectedId((current) => current && nextItems.some((item) => item.id === current) ? current : null);
     setSelectedIds((current) => {
       const valid = new Set(nextItems.map((item) => item.id));
       return new Set([...current].filter((id) => valid.has(id)));
     });
+  };
+
+  const switchWishlist = async (nextSpaceId: string | null) => {
+    setMessage('');
+    setScope('all');
+    setAddFolderId('');
+    setNewFolderParent('');
+    setSelectedId(null);
+    setSelectedIds(new Set());
+    setActiveSpaceId(nextSpaceId);
+    try {
+      await refresh(nextSpaceId);
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to load this Wishlist.'));
+    }
+  };
+
+  const createSharedWishlist = async () => {
+    if (!shareTripId || !shareName.trim()) return;
+    setShareBusy(true); setMessage('');
+    try {
+      const { data, error } = await supabaseRef.current!.rpc('create_shared_wishlist_for_trip', {
+        p_trip_id: shareTripId,
+        p_name: shareName.trim(),
+        p_move_my_existing: shareMoveExisting,
+      });
+      if (error) throw error;
+      const newSpaceId = typeof data === 'string' ? data : null;
+      const nextSpaces = await loadWishlistSpaces(supabaseRef.current!, userId);
+      setSpaces(nextSpaces);
+      if (newSpaceId) await switchWishlist(newSpaceId);
+      setShareMoveExisting(false);
+      setMessage('Shared Wishlist created. Trip collaborators can now use the same Wishlist.');
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to create shared Wishlist.'));
+    } finally {
+      setShareBusy(false);
+    }
   };
 
   const toggleBulkSelection = (id: string) => {
@@ -220,7 +270,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
     const name = result?.name ?? query.trim();
     if (!name) return;
     setMessage('');
-    const { error } = await supabaseRef.current!.rpc('add_wishlist_place', {
+    const { error } = await supabaseRef.current!.rpc('add_wishlist_place_v2', {
       p_name: name,
       p_provider: result?.provider ?? 'manual',
       p_provider_place_id: result?.providerPlaceId ?? null,
@@ -230,18 +280,19 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
       p_folder_id: addFolderId || null,
       p_category: category,
       p_rating: rating,
+      p_space_id: activeSpaceId,
     });
     if (error) { setMessage(error.message); return; }
     setQuery(''); setResults([]);
     await refresh();
-    setMessage(`Saved ${name} to your wishlist.`);
+    setMessage(`Saved ${name} to ${activeSpace?.name ?? 'your personal Wishlist'}.`);
   };
 
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
     setFolderBusy(true); setMessage('');
-    const { error } = await supabaseRef.current!.rpc('create_wishlist_folder', {
-      p_name: newFolderName.trim(), p_parent_id: newFolderParent || null,
+    const { error } = await supabaseRef.current!.rpc('create_wishlist_folder_v2', {
+      p_name: newFolderName.trim(), p_parent_id: newFolderParent || null, p_space_id: activeSpaceId,
     });
     setFolderBusy(false);
     if (error) { setMessage(error.message); return; }
@@ -252,13 +303,13 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
   const renameFolder = async (folder: WishlistFolder) => {
     const name = window.prompt('Rename folder', folder.name)?.trim();
     if (!name || name === folder.name) return;
-    const { error } = await supabaseRef.current!.rpc('rename_wishlist_folder', { p_folder_id: folder.id, p_name: name });
+    const { error } = await supabaseRef.current!.rpc('rename_wishlist_folder_v2', { p_folder_id: folder.id, p_name: name });
     if (error) setMessage(error.message); else await refresh();
   };
 
   const deleteFolder = async (folder: WishlistFolder) => {
     if (!window.confirm(`Delete folder “${folder.name}”? Items and child folders will move up one level; saved places will not be deleted.`)) return;
-    const { error } = await supabaseRef.current!.rpc('delete_wishlist_folder', { p_folder_id: folder.id });
+    const { error } = await supabaseRef.current!.rpc('delete_wishlist_folder_v2', { p_folder_id: folder.id });
     if (error) { setMessage(error.message); return; }
     if (scope === folder.id) setScope(folder.parentId ?? 'all');
     await refresh();
@@ -271,7 +322,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
       category: Object.prototype.hasOwnProperty.call(patch, 'category') ? (patch.category ?? item.category) : item.category,
       rating: Object.prototype.hasOwnProperty.call(patch, 'rating') ? (patch.rating ?? item.rating) : item.rating,
     };
-    const { error } = await supabaseRef.current!.rpc('update_wishlist_item', {
+    const { error } = await supabaseRef.current!.rpc('update_wishlist_item_v2', {
       p_item_id: item.id, p_folder_id: next.folderId, p_category: next.category, p_rating: next.rating,
     });
     setBusyItemId(null);
@@ -281,7 +332,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
 
   const deleteItem = async (item: WishlistItem) => {
     if (!window.confirm(`Remove “${item.name}” from your wishlist?`)) return;
-    const { error } = await supabaseRef.current!.rpc('delete_wishlist_item', { p_item_id: item.id });
+    const { error } = await supabaseRef.current!.rpc('delete_wishlist_item_v2', { p_item_id: item.id });
     if (error) { setMessage(error.message); return; }
     await refresh();
   };
@@ -290,7 +341,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
     const tripId = tripTargets[item.id];
     if (!tripId) { setMessage('Choose a target Trip first.'); return; }
     setBusyItemId(item.id); setMessage('');
-    const { error } = await supabaseRef.current!.rpc('add_wishlist_item_to_trip', { p_item_id: item.id, p_trip_id: tripId });
+    const { error } = await supabaseRef.current!.rpc('add_wishlist_item_to_trip_v2', { p_item_id: item.id, p_trip_id: tripId });
     setBusyItemId(null);
     if (error) { setMessage(error.message); return; }
     const trip = trips.find((value) => value.id === tripId);
@@ -302,7 +353,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
     setBulkBusy(true); setMessage('');
     try {
       const selectedArray = [...selectedIds];
-      const { data, error } = await supabaseRef.current!.rpc('add_wishlist_items_to_trip', {
+      const { data, error } = await supabaseRef.current!.rpc('add_wishlist_items_to_trip_v2', {
         p_item_ids: selectedArray,
         p_trip_id: bulkTripId,
       });
@@ -321,7 +372,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
     if (!name || selectedCount === 0) return;
     setBulkBusy(true); setMessage('');
     try {
-      const { data, error } = await supabaseRef.current!.rpc('create_trip_from_wishlist', {
+      const { data, error } = await supabaseRef.current!.rpc('create_trip_from_wishlist_v2', {
         p_item_ids: [...selectedIds],
         p_name: name,
         p_timezone: 'Asia/Tokyo',
@@ -346,7 +397,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
     setNoteBusyId(item.id);
     setMessage('');
     try {
-      const { error } = await supabaseRef.current!.rpc('update_wishlist_item_notes', {
+      const { error } = await supabaseRef.current!.rpc('update_wishlist_item_notes_v2', {
         p_item_id: item.id,
         p_notes: nextNote || null,
       });
@@ -365,8 +416,8 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
     return <div key={folder.id}>
       <div className={scope === folder.id ? 'folderRow active' : 'folderRow'} style={{ paddingLeft: `${8 + depth * 16}px` }}>
         <button type="button" className="folderSelect" onClick={() => { setScope(folder.id); setAddFolderId(folder.id); setNewFolderParent(folder.id); }}><span>📁</span><span>{folder.name}</span><small>{count}</small></button>
-        <button type="button" className="folderMiniAction" onClick={() => void renameFolder(folder)} title="Rename folder">✎</button>
-        <button type="button" className="folderMiniAction danger" onClick={() => void deleteFolder(folder)} title="Delete folder">×</button>
+        <button type="button" className="folderMiniAction" disabled={!canEditWishlist} onClick={() => void renameFolder(folder)} title="Rename folder">✎</button>
+        <button type="button" className="folderMiniAction danger" disabled={!canEditWishlist} onClick={() => void deleteFolder(folder)} title="Delete folder">×</button>
       </div>
       {(childrenByParent.get(folder.id) ?? []).map((child) => renderFolder(child, depth + 1))}
     </div>;
@@ -374,41 +425,76 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
 
   return <main className="tripShell wishlistShell">
     <header className="tripHeader">
-      <div><div className="eyebrow">NekoTrip · Global Wishlist</div><h1>Wish List</h1><div className="subtitle">{userName} · independent from every Trip</div></div>
-      <div className="headerActions"><Link className="secondaryLink" href="/">Trips</Link></div>
+      <div>
+        <div className="eyebrow">NekoTrip · Wishlist</div>
+        <h1>{activeSpace?.name ?? 'My Wishlist'}</h1>
+        <div className="subtitle">
+          {activeSpace ? `${userName} · shared · ${activeSpace.role}` : `${userName} · private`}
+        </div>
+      </div>
+      <div className="headerActions">
+        <select
+          className="inlineMetaSelect"
+          value={activeSpaceId ?? ''}
+          onChange={(event) => void switchWishlist(event.target.value || null)}
+          aria-label="Wishlist collection"
+        >
+          <option value="">🔒 My Wishlist</option>
+          {spaces.map((space) => <option key={space.id} value={space.id}>👥 {space.name}</option>)}
+        </select>
+        <button className="secondaryButton compactButton" type="button" onClick={() => void refresh()}>Refresh</button>
+        <Link className="secondaryLink" href="/">Trips</Link>
+      </div>
     </header>
 
     <div className="wishlistLayout">
       <aside className="panel wishlistSidebar">
-        <div className="sectionHeading"><div><strong>Folders</strong><small>Nested folders are global to your account.</small></div></div>
+        <div className="sectionHeading"><div><strong>Folders</strong><small>{activeSpace ? `Shared in ${activeSpace.name}.` : 'Private to your account.'}</small></div></div>
         <div className="folderTree">
           <button type="button" className={scope === 'all' ? 'folderRoot active' : 'folderRoot'} onClick={() => setScope('all')}>🗺️ All places <small>{items.length}</small></button>
           <button type="button" className={scope === 'unfiled' ? 'folderRoot active' : 'folderRoot'} onClick={() => { setScope('unfiled'); setAddFolderId(''); }}>📥 Unfiled <small>{items.filter((item) => item.folderId === null).length}</small></button>
           {(childrenByParent.get(null) ?? []).map((folder) => renderFolder(folder, 0))}
         </div>
         <div className="folderCreator">
-          <input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder="New folder name" />
-          <select value={newFolderParent} onChange={(event) => setNewFolderParent(event.target.value)}>
+          <input value={newFolderName} disabled={!canEditWishlist} onChange={(event) => setNewFolderName(event.target.value)} placeholder="New folder name" />
+          <select value={newFolderParent} disabled={!canEditWishlist} onChange={(event) => setNewFolderParent(event.target.value)}>
             <option value="">Top level</option>
             {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
           </select>
-          <button className="primaryButton" type="button" disabled={folderBusy || !newFolderName.trim()} onClick={() => void createFolder()}>{folderBusy ? 'Creating…' : '+ Create folder'}</button>
+          <button className="primaryButton" type="button" disabled={!canEditWishlist || folderBusy || !newFolderName.trim()} onClick={() => void createFolder()}>{folderBusy ? 'Creating…' : '+ Create folder'}</button>
+        </div>
+
+        <div className="folderCreator">
+          <strong>Share a Wishlist</strong>
+          <small>Create one from an existing Trip. Its collaborators become Wishlist members.</small>
+          <select value={shareTripId} onChange={(event) => setShareTripId(event.target.value)}>
+            <option value="">Choose Trip…</option>
+            {trips.map((trip) => <option key={`share-${trip.id}`} value={trip.id}>{trip.name}</option>)}
+          </select>
+          <input value={shareName} onChange={(event) => setShareName(event.target.value)} placeholder="Shared Wishlist name" maxLength={120} />
+          <label className="trafficToggle">
+            <input type="checkbox" checked={shareMoveExisting} onChange={(event) => setShareMoveExisting(event.target.checked)} />
+            <span>Move my current private Wishlist into it</span>
+          </label>
+          <button className="primaryButton" type="button" disabled={shareBusy || !shareTripId || !shareName.trim()} onClick={() => void createSharedWishlist()}>
+            {shareBusy ? 'Creating…' : 'Create shared Wishlist'}
+          </button>
         </div>
       </aside>
 
       <section className="panel wishlistListPanel">
         <div className="sectionHeading"><div><strong>Add to wishlist</strong><small>Search once, decide which Trip later.</small></div></div>
         <form className="placeForm" onSubmit={(event) => { event.preventDefault(); void searchPlaces(); }}>
-          <input value={query} onChange={(event) => { setQuery(event.target.value); setResults([]); }} placeholder="例如：蔵王キツネ村" aria-label="Wishlist place search" />
+          <input value={query} disabled={!canEditWishlist} onChange={(event) => { setQuery(event.target.value); setResults([]); }} placeholder="例如：蔵王キツネ村" aria-label="Wishlist place search" />
           <div className="formRow">
-            <select value={addFolderId} onChange={(event) => setAddFolderId(event.target.value)}><option value="">Unfiled</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((value) => <option key={value}>{value}</option>)}</select>
+            <select value={addFolderId} disabled={!canEditWishlist} onChange={(event) => setAddFolderId(event.target.value)}><option value="">Unfiled</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select>
+            <select value={category} disabled={!canEditWishlist} onChange={(event) => setCategory(event.target.value)}>{categories.map((value) => <option key={value}>{value}</option>)}</select>
           </div>
           <div className="formRow">
-            <select value={rating} onChange={(event) => setRating(Number(event.target.value))}>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}</select>
-            <button className="primaryButton" type="submit" disabled={!query.trim() || searching}>{searching ? 'Searching…' : 'Search Google'}</button>
+            <select value={rating} disabled={!canEditWishlist} onChange={(event) => setRating(Number(event.target.value))}>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}</select>
+            <button className="primaryButton" type="submit" disabled={!canEditWishlist || !query.trim() || searching}>{searching ? 'Searching…' : 'Search Google'}</button>
           </div>
-          <button className="secondaryButton" type="button" disabled={!query.trim()} onClick={() => void addPlace(null)}>Add manually without map location</button>
+          <button className="secondaryButton" type="button" disabled={!canEditWishlist || !query.trim()} onClick={() => void addPlace(null)}>Add manually without map location</button>
         </form>
 
         {message && <div className="statusMessage" role="status">{message}</div>}
@@ -446,7 +532,7 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
                   <input type="checkbox" checked={bulkSelected} onChange={() => toggleBulkSelection(item.id)} aria-label={`Select ${item.name}`} />
                 </label>
                 <button type="button" className="placeSelect" onClick={() => setSelectedId(item.id)}><span>{categoryIcons[item.category] ?? '📍'}</span><span><strong>{item.name}</strong>{item.formattedAddress && <small>{item.formattedAddress}</small>}</span></button>
-                <button type="button" className="deleteButton" onClick={(event) => { event.stopPropagation(); void deleteItem(item); }}>Remove</button>
+                <button type="button" className="deleteButton" disabled={!canEditWishlist} onClick={(event) => { event.stopPropagation(); void deleteItem(item); }}>Remove</button>
               </div>
               <GooglePlaceDetailsCard apiKey={apiKey} providerPlaceId={item.providerPlaceId} fallbackAddress={item.formattedAddress} placeName={item.name} category={item.category} variant="rich" />
               <div className="wishlistNotes" onClick={(event) => event.stopPropagation()}>
@@ -476,14 +562,14 @@ export function WishlistWorkspace({ userId, userName, initialFolders, initialIte
                   </div>}
                 </div>
                 <div className="wishlistNotesActions">
-                  <span className="muted">Private to your Wishlist.</span>
-                  <button className="secondaryButton compactButton" type="button" disabled={noteBusyId === item.id || (noteDrafts[item.id] ?? '').trim() === (item.notes ?? '').trim()} onClick={() => void saveNote(item)}>{noteBusyId === item.id ? 'Saving…' : 'Save note'}</button>
+                  <span className="muted">{activeSpace ? `Shared with ${activeSpace.name}.` : 'Private to your Wishlist.'}</span>
+                  <button className="secondaryButton compactButton" type="button" disabled={!canEditWishlist || noteBusyId === item.id || (noteDrafts[item.id] ?? '').trim() === (item.notes ?? '').trim()} onClick={() => void saveNote(item)}>{noteBusyId === item.id ? 'Saving…' : 'Save note'}</button>
                 </div>
               </div>
               <div className="wishlistItemControls" onClick={(event) => event.stopPropagation()}>
-                <label className="compactField"><span>Folder</span><select className="inlineMetaSelect" value={item.folderId ?? ''} disabled={busyItemId === item.id} onChange={(event) => void updateItem(item, { folderId: event.target.value || null })}><option value="">Unfiled</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label>
-                <label className="compactField"><span>Type</span><select className="inlineMetaSelect" value={item.category} disabled={busyItemId === item.id} onChange={(event) => void updateItem(item, { category: event.target.value })}>{categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? '📍'} {value}</option>)}</select></label>
-                <label className="compactField"><span>Stars</span><select className="inlineMetaSelect" value={item.rating} disabled={busyItemId === item.id} onChange={(event) => void updateItem(item, { rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}</select></label>
+                <label className="compactField"><span>Folder</span><select className="inlineMetaSelect" value={item.folderId ?? ''} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { folderId: event.target.value || null })}><option value="">Unfiled</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label>
+                <label className="compactField"><span>Type</span><select className="inlineMetaSelect" value={item.category} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { category: event.target.value })}>{categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? '📍'} {value}</option>)}</select></label>
+                <label className="compactField"><span>Stars</span><select className="inlineMetaSelect" value={item.rating} disabled={!canEditWishlist || busyItemId === item.id} onChange={(event) => void updateItem(item, { rating: Number(event.target.value) })}>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}</select></label>
               </div>
               <div className="wishlistTripAction" onClick={(event) => event.stopPropagation()}>
                 <select value={tripTargets[item.id] ?? ''} onChange={(event) => setTripTargets((current) => ({ ...current, [item.id]: event.target.value }))}><option value="">Choose Trip…</option>{trips.map((trip) => <option key={trip.id} value={trip.id}>{trip.name}</option>)}</select>
