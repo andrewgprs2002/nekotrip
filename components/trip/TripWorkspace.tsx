@@ -14,6 +14,17 @@ import { countTripMembers, loadTripDays, loadTripPlaces } from '@/lib/repositori
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { TripDay, TripPlaceItem, TripRole } from '@/lib/domain/types';
 
+interface TripWishlistConsensus {
+  tripPlaceId: string;
+  sourceWishlistItemId: string;
+  sourceWishlistName: string;
+  averageRating: number | null;
+  ratingCount: number;
+  eligibleCount: number;
+  spread: number;
+  consensusScore: number | null;
+  tripRank: number | null;
+}
 const categories = ['Sightseeing', 'Restaurant', 'Cafe', 'Hotel', 'Onsen', 'Shopping', 'Station'];
 const categoryIcons: Record<string, string> = {
   Sightseeing: '📷', Restaurant: '🍣', Cafe: '☕', Hotel: '🏨', Onsen: '♨️', Shopping: '🛍️', Station: '🚉',
@@ -50,6 +61,7 @@ export function TripWorkspace({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? '';
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const [tripConsensus, setTripConsensus] = useState<TripWishlistConsensus[]>([]);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
   const lastTripRevisionRef = useRef<string | null>(null);
   const pollBusyRef = useRef(false);
@@ -311,6 +323,40 @@ export function TripWorkspace({
     }
   }, [tripId, userId]);
 
+  const refreshTripConsensus = useCallback(async () => {
+    try {
+      const { data, error } = await supabaseRef.current!.rpc('list_trip_wishlist_consensus', {
+        p_trip_id: tripId,
+      });
+      if (error) throw error;
+
+      setTripConsensus(Array.isArray(data) ? data.map((row: any) => ({
+        tripPlaceId: row.trip_place_id as string,
+        sourceWishlistItemId: row.source_wishlist_item_id as string,
+        sourceWishlistName: (row.source_wishlist_name ?? 'Shared Wishlist') as string,
+        averageRating: row.average_rating === null ? null : Number(row.average_rating),
+        ratingCount: Number(row.rating_count ?? 0),
+        eligibleCount: Number(row.eligible_count ?? 0),
+        spread: Number(row.spread ?? 0),
+        consensusScore: row.consensus_score === null ? null : Number(row.consensus_score),
+        tripRank: row.trip_rank === null ? null : Number(row.trip_rank),
+      })) : []);
+    } catch (cause) {
+      console.warn('Unable to refresh Trip consensus ratings', cause);
+      setTripConsensus([]);
+    }
+  }, [tripId]);
+
+  useEffect(() => {
+    void refreshTripConsensus();
+    const timer = window.setInterval(() => void refreshTripConsensus(), 10000);
+    return () => window.clearInterval(timer);
+  }, [refreshTripConsensus]);
+
+  const consensusByPlaceId = useMemo(
+    () => new Map(tripConsensus.map((row) => [row.tripPlaceId, row])),
+    [tripConsensus]
+  );
   const refreshMembers = useCallback(async () => {
     try { setMemberCount(await countTripMembers(supabaseRef.current!, tripId)); } catch { /* non-critical */ }
   }, [tripId]);
@@ -676,9 +722,7 @@ export function TripWorkspace({
             </select>
           </div>
           <div className="formRow">
-            <select value={priority} disabled={!canEdit} onChange={(event) => setPriority(Number(event.target.value))} aria-label="Your priority">
-              {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5 - value)}</option>)}
-            </select>
+            <div className="tripConsensusHint">Consensus ratings come from Shared Wishlist. Manually added Trip places have no consensus source.</div>
             <button className="primaryButton" type="submit" disabled={!canEdit || searching || !query.trim()}>{searching ? 'Searching…' : 'Search Google'}</button>
           </div>
           <button className="secondaryButton" type="button" disabled={!canEdit || !query.trim()} onClick={() => void persistPlace(null)}>Add manually without map location</button>
@@ -747,19 +791,31 @@ export function TripWorkspace({
                   {categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? '📍'} {value}</option>)}
                 </select>
               </label>
+              <div className="compactField tripConsensusField">
+                <span>Consensus ranking</span>
+                {(() => {
+                  const consensus = consensusByPlaceId.get(place.id);
+                  if (!consensus) {
+                    return <div className="tripConsensusValue">
+                      <strong>No consensus rating</strong>
+                      <small>Not linked to an accessible Shared Wishlist.</small>
+                    </div>;
+                  }
 
-              <label className="compactField">
-                <span>Your stars</span>
-                <select
-                  className="inlineMetaSelect starSelect"
-                  value={place.priority}
-                  disabled={!canEdit || busyPlaceId === place.id}
-                  onChange={(event) => void updatePlaceDetails(place.id, { priority: Number(event.target.value) })}
-                  aria-label={`Change your rating for ${place.name}`}
-                >
-                  {[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5 - value)}</option>)}
-                </select>
-              </label>
+                  return <div className="tripConsensusValue">
+                    <strong className="tripConsensusScore">
+                      {consensus.tripRank !== null && <span className="tripConsensusRank">#{consensus.tripRank}</span>}
+                      <span>{consensus.consensusScore === null ? 'No score' : `${consensus.consensusScore.toFixed(1)} / 100`}</span>
+                    </strong>
+                    <small>
+                      {consensus.averageRating === null ? 'No votes yet' : `Avg ${consensus.averageRating.toFixed(2)} / 5`}
+                      {` · ${consensus.ratingCount}/${Math.max(consensus.eligibleCount, 1)} voted`}
+                      {consensus.ratingCount >= 2 ? ` · spread ${consensus.spread.toFixed(2)}` : ''}
+                    </small>
+                    <small className="tripConsensusSource">{consensus.sourceWishlistName}</small>
+                  </div>;
+                })()}
+              </div>
 
               <label className="compactField">
                 <span>Stay (min)</span>
