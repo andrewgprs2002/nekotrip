@@ -852,3 +852,48 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .emojiCategory:hover, .emojiCategory.active { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .wishlistEmojiPickerPanel .wishlistEmojiPicker { max-height: 132px; overflow-y: auto; padding-right: 2px; }
 .wishlistEmojiPickerPanel .wishlistEmojiButton { font-size: 20px; }
+
+/* v0.8.2.1 Shared Wishlist sidebar overflow hotfix */
+.folderCreator,
+.folderCreator * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.folderCreator input,
+.folderCreator select,
+.folderCreator .primaryButton,
+.folderCreator .secondaryButton {
+  width: 100%;
+  max-width: 100%;
+}
+
+.folderCreator small {
+  overflow-wrap: anywhere;
+}
+
+/* v0.8.2.2 Shared Wishlist checkbox layout hotfix */
+.folderCreator .trafficToggle {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  white-space: normal;
+  padding: 8px 10px;
+}
+
+.folderCreator .trafficToggle input[type="checkbox"] {
+  width: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  padding: 0;
+}
+
+.folderCreator .trafficToggle > span {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
