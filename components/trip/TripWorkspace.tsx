@@ -8,6 +8,7 @@ import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCar
 import { ShareTripButton } from '@/components/trip/ShareTripButton';
 import { TripSettingsButton } from '@/components/trip/TripSettingsButton';
 import { TripExpensesPanel } from '@/components/trip/TripExpensesPanel';
+import { TripMembersButton } from '@/components/trip/TripMembersButton';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
 import { createClient } from '@/lib/supabase/client';
 import { countTripMembers, loadTripDays, loadTripPlaces } from '@/lib/repositories/trips';
@@ -679,7 +680,13 @@ export function TripWorkspace({
         <div className="subtitle">{userName} · <span className={realtimeStatus === 'live' ? 'liveText' : realtimeStatus === 'error' ? 'errorText' : ''}>{realtimeStatus === 'live' ? '● Live sync · realtime + DB fallback' : realtimeStatus === 'error' ? '● Live sync · DB fallback' : '○ Connecting realtime · DB fallback active'}</span></div>
       </div>
       <div className="headerActions">
-        <div className="memberPill"><span className="onlineDot" /> {memberCount} member{memberCount === 1 ? '' : 's'}</div>
+        <TripMembersButton
+          tripId={tripId}
+          currentUserId={userId}
+          currentUserRole={memberRole}
+          memberCount={memberCount}
+          onMembersChanged={refreshMembers}
+        />
         <ShareTripButton tripId={tripId} userId={userId} canInvite={memberRole === 'owner'} />
         <TripSettingsButton
           tripId={tripId}

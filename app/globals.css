@@ -1449,3 +1449,77 @@ button.wishlistRankingRow:hover {
     min-width: 0;
   }
 }
+
+
+/* v0.8.9 Trip member management */
+.tripMembersControl { position: relative; }
+.tripMembersTrigger { cursor: pointer; }
+.tripMembersPopover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 50px rgba(0,0,0,.18);
+}
+.tripMembersHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.tripMembersHeader > div { display: grid; gap: 2px; }
+.tripMembersHeader small,
+.tripMembersMessage,
+.tripMembersEmpty { color: var(--muted); }
+.tripMembersList { display: grid; gap: 8px; }
+.tripMemberRow {
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.tripMemberIdentity { display: grid; gap: 3px; min-width: 0; }
+.tripMemberRole {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.tripMemberEmail { overflow-wrap: anywhere; font-size: 13px; }
+.tripMemberRemove {
+  justify-self: start;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tripMemberRemove:disabled { cursor: wait; opacity: .6; }
+.tripMembersMessage {
+  display: block;
+  margin-top: 9px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.tripMembersEmpty { padding: 10px 0 4px; font-size: 12px; }
+
+@media (max-width: 640px) {
+  .tripMembersPopover {
+    position: fixed;
+    top: 76px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
