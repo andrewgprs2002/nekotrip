@@ -1523,3 +1523,70 @@ button.wishlistRankingRow:hover {
     width: auto;
   }
 }
+
+
+/* v0.8.11 inline Trip date management */
+.tripInlineDates {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tripInlineDates label {
+  display: grid;
+  gap: 3px;
+}
+
+.tripInlineDates label > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.tripInlineDates input[type="date"] {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.tripInlineDateArrow {
+  padding-bottom: 8px;
+  color: var(--muted);
+}
+
+.tripInlineDates > small {
+  flex-basis: 100%;
+  font-size: 11px;
+}
+
+.tripInlineDatesReadOnly {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .tripInlineDates {
+    align-items: stretch;
+  }
+
+  .tripInlineDates label {
+    flex: 1 1 140px;
+  }
+
+  .tripInlineDates input[type="date"] {
+    width: 100%;
+  }
+
+  .tripInlineDateArrow {
+    display: none;
+  }
+}

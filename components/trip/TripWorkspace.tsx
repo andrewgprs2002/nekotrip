@@ -7,6 +7,7 @@ import { GoogleTripMap, type RouteMode, type RouteSummary, type RouteOptimizatio
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
 import { ShareTripButton } from '@/components/trip/ShareTripButton';
 import { TripSettingsButton } from '@/components/trip/TripSettingsButton';
+import { TripDateControls } from '@/components/trip/TripDateControls';
 import { TripExpensesPanel } from '@/components/trip/TripExpensesPanel';
 import { TripMembersButton } from '@/components/trip/TripMembersButton';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
@@ -678,6 +679,18 @@ export function TripWorkspace({
         <div className="eyebrow">NekoTrip · {memberRole}</div>
         <h1>{tripTitle}</h1>
         <div className="subtitle">{userName} · <span className={realtimeStatus === 'live' ? 'liveText' : realtimeStatus === 'error' ? 'errorText' : ''}>{realtimeStatus === 'live' ? '● Live sync · realtime + DB fallback' : realtimeStatus === 'error' ? '● Live sync · DB fallback' : '○ Connecting realtime · DB fallback active'}</span></div>
+        <TripDateControls
+          tripId={tripId}
+          startDate={startDate}
+          endDate={endDate}
+          memberRole={memberRole}
+          onDatesChanged={async (nextStartDate, nextEndDate) => {
+            setStartDate(nextStartDate);
+            setEndDate(nextEndDate);
+            await Promise.all([refreshDays(), refreshPlaces()]);
+            void broadcastTripChanged('trip_dates_changed');
+          }}
+        />
       </div>
       <div className="headerActions">
         <TripMembersButton
