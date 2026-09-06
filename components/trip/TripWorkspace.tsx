@@ -7,6 +7,7 @@ import { GoogleTripMap, type RouteMode, type RouteSummary, type RouteOptimizatio
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
 import { ShareTripButton } from '@/components/trip/ShareTripButton';
 import { TripSettingsButton } from '@/components/trip/TripSettingsButton';
+import { TripExpensesPanel } from '@/components/trip/TripExpensesPanel';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
 import { createClient } from '@/lib/supabase/client';
 import { countTripMembers, loadTripDays, loadTripPlaces } from '@/lib/repositories/trips';
@@ -801,6 +802,8 @@ export function TripWorkspace({
           </article>)}
         </div>
       </section>
+
+      <TripExpensesPanel tripId={tripId} items={items} canEdit={canEdit} />
 
       <section className="panel mapPanel">
         <div className="mapHeader">

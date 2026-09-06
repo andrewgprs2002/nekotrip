@@ -40,6 +40,9 @@ interface SharedRatingSummary {
   average: number | null;
   count: number;
   disagreement: number;
+  coverage: number;
+  agreement: number;
+  consensusScore: number | null;
 }
 
 interface Props {
@@ -122,24 +125,62 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     return map;
   }, [sharedRatings]);
 
+  const eligibleRatingMemberCount = useMemo(
+    () => members.filter((member) => member.role === 'owner' || member.role === 'editor').length,
+    [members]
+  );
+
   const ratingSummaries = useMemo(() => {
     const map = new Map<string, SharedRatingSummary>();
+    const eligibleCount = Math.max(eligibleRatingMemberCount, 1);
+
     for (const [itemId, rows] of ratingsByItem.entries()) {
       const values = rows.map((row) => row.rating);
       if (values.length === 0) {
-        map.set(itemId, { average: null, count: 0, disagreement: 0 });
+        map.set(itemId, {
+          average: null,
+          count: 0,
+          disagreement: 0,
+          coverage: 0,
+          agreement: 0,
+          consensusScore: null,
+        });
         continue;
       }
+
       const average = values.reduce((sum, value) => sum + value, 0) / values.length;
       const variance = values.reduce((sum, value) => sum + Math.pow(value - average, 2), 0) / values.length;
+      const disagreement = Math.sqrt(variance);
+      const coverage = Math.min(1, values.length / eligibleCount);
+
+      // Agreement is not treated as perfect when only one person has voted.
+      // With 2+ votes, a population standard deviation of 2.0 or more bottoms out at 0.
+      const agreement = values.length <= 1
+        ? coverage
+        : Math.max(0, 1 - Math.min(disagreement / 2, 1));
+
+      // 0-100 decision score:
+      // 70% how much the group likes it
+      // 20% how much of the eligible group has actually voted
+      // 10% how strongly the voters agree
+      const consensusScore = 100 * (
+        0.70 * (average / 5) +
+        0.20 * coverage +
+        0.10 * agreement
+      );
+
       map.set(itemId, {
         average,
         count: values.length,
-        disagreement: Math.sqrt(variance),
+        disagreement,
+        coverage,
+        agreement,
+        consensusScore,
       });
     }
+
     return map;
-  }, [ratingsByItem]);
+  }, [eligibleRatingMemberCount, ratingsByItem]);
 
   const currentUserRatings = useMemo(() => {
     const map = new Map<string, number>();
@@ -214,12 +255,17 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
 
     const next = [...visible];
     next.sort((a, b) => {
-      const aSummary = ratingSummaries.get(a.id) ?? { average: null, count: 0, disagreement: 0 };
-      const bSummary = ratingSummaries.get(b.id) ?? { average: null, count: 0, disagreement: 0 };
+      const aSummary = ratingSummaries.get(a.id) ?? { average: null, count: 0, disagreement: 0, coverage: 0, agreement: 0, consensusScore: null };
+      const bSummary = ratingSummaries.get(b.id) ?? { average: null, count: 0, disagreement: 0, coverage: 0, agreement: 0, consensusScore: null };
 
       if (aSummary.average === null && bSummary.average !== null) return 1;
       if (aSummary.average !== null && bSummary.average === null) return -1;
       if (aSummary.average === null && bSummary.average === null) return a.name.localeCompare(b.name);
+
+      if (sharedRatingSort === 'consensus') {
+        const scoreDiff = (bSummary.consensusScore ?? 0) - (aSummary.consensusScore ?? 0);
+        if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+      }
 
       const averageDiff = (bSummary.average ?? 0) - (aSummary.average ?? 0);
       if (Math.abs(averageDiff) > 0.0001) return averageDiff;
@@ -240,13 +286,15 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
 
   const rankedVisible = useMemo(
     () => [...visible].sort((a, b) => {
-      const aSummary = ratingSummaries.get(a.id) ?? { average: null, count: 0, disagreement: 0 };
-      const bSummary = ratingSummaries.get(b.id) ?? { average: null, count: 0, disagreement: 0 };
+      const aSummary = ratingSummaries.get(a.id) ?? { average: null, count: 0, disagreement: 0, coverage: 0, agreement: 0, consensusScore: null };
+      const bSummary = ratingSummaries.get(b.id) ?? { average: null, count: 0, disagreement: 0, coverage: 0, agreement: 0, consensusScore: null };
 
       if (aSummary.average === null && bSummary.average !== null) return 1;
       if (aSummary.average !== null && bSummary.average === null) return -1;
       if (aSummary.average === null && bSummary.average === null) return a.name.localeCompare(b.name);
 
+      const scoreDiff = (bSummary.consensusScore ?? 0) - (aSummary.consensusScore ?? 0);
+      if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
       const averageDiff = (bSummary.average ?? 0) - (aSummary.average ?? 0);
       if (Math.abs(averageDiff) > 0.0001) return averageDiff;
       const countDiff = bSummary.count - aSummary.count;
@@ -810,7 +858,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
           <div className="wishlistConsensusHeader">
             <div>
               <strong>Consensus ranking</strong>
-              <small>Average first; ties favor more votes, then lower disagreement.</small>
+              <small>Score = 70% average + 20% voter coverage + 10% agreement. Higher is the stronger group choice.</small>
             </div>
             <label className="compactField wishlistRatingSort">
               <span>List order</span>
@@ -830,12 +878,13 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
             <div className="wishlistRankingRow wishlistRankingHead" role="row">
               <span role="columnheader">#</span>
               <span role="columnheader">Place</span>
+              <span role="columnheader">Score</span>
               <span role="columnheader">Avg</span>
               <span role="columnheader">Votes</span>
               <span role="columnheader">Spread</span>
             </div>
             {rankedVisible.slice(0, 10).map((item, index) => {
-              const summary = ratingSummaries.get(item.id) ?? { average: null, count: 0, disagreement: 0 };
+              const summary = ratingSummaries.get(item.id) ?? { average: null, count: 0, disagreement: 0, coverage: 0, agreement: 0, consensusScore: null };
               return <button
                 key={`rank-${item.id}`}
                 type="button"
@@ -845,8 +894,9 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
               >
                 <span role="cell">{index + 1}</span>
                 <span role="cell" className="wishlistRankingName">{item.name}</span>
-                <strong role="cell">{summary.average === null ? '—' : summary.average.toFixed(2)}</strong>
-                <span role="cell">{summary.count}</span>
+                <strong role="cell">{summary.consensusScore === null ? '—' : summary.consensusScore.toFixed(1)}</strong>
+                <span role="cell">{summary.average === null ? '—' : summary.average.toFixed(2)}</span>
+                <span role="cell">{summary.count}/{Math.max(eligibleRatingMemberCount, 1)}</span>
                 <span role="cell">{summary.count < 2 ? '—' : summary.disagreement.toFixed(2)}</span>
               </button>;
             })}
@@ -936,12 +986,16 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
               </div>
               {activeSpace && (() => {
                 const rows = ratingsByItem.get(item.id) ?? [];
-                const summary = ratingSummaries.get(item.id) ?? { average: null, count: 0, disagreement: 0 };
+                const summary = ratingSummaries.get(item.id) ?? { average: null, count: 0, disagreement: 0, coverage: 0, agreement: 0, consensusScore: null };
                 return <div className="wishlistSharedRatingSummary" onClick={(event) => event.stopPropagation()}>
                   <div className="wishlistAverageScore">
                     <span>Average</span>
                     <strong>{summary.average === null ? '—' : `${summary.average.toFixed(2)} / 5`}</strong>
-                    <small>{summary.count} rating{summary.count === 1 ? '' : 's'}{summary.count >= 2 ? ` · spread ${summary.disagreement.toFixed(2)}` : ''}</small>
+                    <small>
+                      {summary.consensusScore === null ? 'No consensus score' : `Consensus ${summary.consensusScore.toFixed(1)}`}
+                      {` · ${summary.count}/${Math.max(eligibleRatingMemberCount, 1)} voted`}
+                      {summary.count >= 2 ? ` · spread ${summary.disagreement.toFixed(2)}` : ''}
+                    </small>
                   </div>
                   <div className="wishlistMemberRatings">
                     {rows.length === 0 && <span className="muted">No editor ratings yet.</span>}

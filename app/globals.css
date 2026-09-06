@@ -1075,3 +1075,243 @@ button.wishlistRankingRow:hover {
     grid-column: 1 / -1;
   }
 }
+
+
+/* v0.8.4 Consensus score + Trip Expenses */
+.wishlistRankingRow {
+  grid-template-columns: 28px minmax(0, 1fr) 58px 52px 52px 52px;
+}
+
+.tripExpensesPanel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.tripExpenseSummaryGrid {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.tripExpenseSummaryCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+}
+
+.tripExpenseSummaryTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 9px;
+}
+
+.tripExpenseMemberSummary {
+  display: grid;
+  gap: 5px;
+}
+
+.tripExpenseMemberSummaryRow {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) repeat(3, auto);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.tripExpenseMemberSummaryRow > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expenseBalanceDue { color: var(--danger); }
+.expenseBalanceCredit { color: #38c793; }
+
+.tripExpenseStopList {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.tripExpenseStopRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: var(--surface);
+}
+
+.tripExpenseStopName {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.tripExpenseStopName strong,
+.tripExpenseStopName small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tripExpenseStopName small,
+.tripExpensePaymentProgress {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tripExpenseEditor {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface-2);
+}
+
+.tripExpenseEditorHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.tripExpenseEditorHeader > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tripExpenseEditorHeader small {
+  color: var(--muted);
+}
+
+.tripExpenseEditorGrid {
+  display: grid;
+  grid-template-columns: 1fr 100px 150px minmax(180px, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tripExpenseEditorGrid label {
+  display: grid;
+  gap: 4px;
+}
+
+.tripExpenseEditorGrid label > span,
+.tripExpenseShareHead {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.tripExpenseEditorGrid input,
+.tripExpenseEditorGrid select,
+.tripExpenseShareRow input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+}
+
+.tripExpenseShareTable {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.tripExpenseShareRow {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 120px 120px 95px;
+  gap: 8px;
+  align-items: center;
+}
+
+.tripExpenseShareEmail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tripExpensePaidToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tripExpensePaidToggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.tripExpenseEditorActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .tripExpenseMemberSummaryRow {
+    grid-template-columns: minmax(100px, 1fr) 1fr 1fr;
+  }
+
+  .tripExpenseMemberSummaryRow > :last-child {
+    grid-column: 2 / -1;
+  }
+
+  .tripExpenseEditorGrid {
+    grid-template-columns: 1fr 100px;
+  }
+
+  .tripExpenseNoteField {
+    grid-column: 1 / -1;
+  }
+
+  .tripExpenseShareRow {
+    grid-template-columns: minmax(120px, 1fr) 100px 100px;
+  }
+
+  .tripExpenseShareRow > :last-child {
+    grid-column: 2 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .wishlistRankingRow {
+    grid-template-columns: 24px minmax(0, 1fr) 48px 44px;
+  }
+
+  .wishlistRankingRow > :nth-child(5),
+  .wishlistRankingRow > :nth-child(6) {
+    display: none;
+  }
+
+  .tripExpenseStopRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .tripExpensePaymentProgress {
+    grid-column: 1 / -1;
+  }
+
+  .tripExpenseEditorGrid,
+  .tripExpenseShareRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tripExpenseShareRow > :last-child,
+  .tripExpenseNoteField {
+    grid-column: auto;
+  }
+}
