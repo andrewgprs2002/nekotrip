@@ -1590,3 +1590,183 @@ button.wishlistRankingRow:hover {
     display: none;
   }
 }
+
+
+/* v0.8.12 Trip Message Board */
+.tripMessageBoardPanel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.tripMessageBoardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tripMessageBoardHeader small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.tripMessageList {
+  min-height: 240px;
+  max-height: 58vh;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.tripMessageItem {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+
+.tripMessageMeta {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.tripMessageMeta strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.tripMessageMeta time {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.tripMessageText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.tripMessageDelete {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tripMessageDelete:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.tripMessageComposer {
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.tripMessageComposer textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.tripMessageComposer textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tripMessageComposerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tripMessageComposerFooter small,
+.tripMessageViewerNote,
+.tripMessageEmpty {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tripMessageEmpty {
+  padding: 16px 4px;
+  text-align: center;
+}
+
+/* Wide desktop: Itinerary | Map | Message Board */
+@media (min-width: 1450px) {
+  .tripShell {
+    width: min(2240px, calc(100vw - 32px));
+    max-width: none;
+  }
+
+  .workspaceGrid {
+    grid-template-columns: minmax(400px, 480px) minmax(620px, 1fr) minmax(290px, 340px);
+    gap: 22px;
+  }
+
+  .workspaceGrid > .itineraryPanel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .workspaceGrid > .mapPanel {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .workspaceGrid > .tripMessageBoardPanel {
+    grid-column: 3;
+    grid-row: 1;
+    position: sticky;
+    top: 14px;
+    max-height: calc(100vh - 28px);
+  }
+
+  .workspaceGrid > .tripExpensesPanel {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Medium desktop: keep itinerary + map on top, board below them, expenses last. */
+@media (min-width: 1121px) and (max-width: 1449px) {
+  .workspaceGrid > .tripMessageBoardPanel {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .workspaceGrid > .tripExpensesPanel {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .tripMessageList {
+    max-height: 360px;
+  }
+}
