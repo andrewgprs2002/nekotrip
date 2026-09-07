@@ -1942,3 +1942,97 @@ button.wishlistRankingRow:hover {
 .tripMemberIdentity > strong {
   overflow-wrap: anywhere;
 }
+/* v0.8.18 first-time onboarding */
+.onboardingBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, .58);
+}
+
+.onboardingTarget {
+  position: relative;
+  z-index: 1001 !important;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--accent) 75%, white 25%),
+    0 12px 46px rgba(0, 0, 0, .35);
+}
+
+.onboardingCoach {
+  position: fixed;
+  z-index: 1002;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .36);
+}
+
+.onboardingCoachProgress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.onboardingCoach h2 {
+  margin: 9px 0 7px;
+  font-size: 20px;
+  letter-spacing: -.02em;
+}
+
+.onboardingCoach p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.onboardingCoachActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.onboardingCoachActions > div {
+  display: flex;
+  gap: 7px;
+}
+
+.profilePopoverActions {
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .onboardingCoach {
+    top: auto !important;
+    right: 12px;
+    bottom: 12px;
+    left: 12px !important;
+    width: auto !important;
+  }
+
+  .onboardingCoachActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .onboardingCoachActions > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .onboardingCoachActions > button,
+  .onboardingCoachActions > div > button {
+    width: 100%;
+  }
+}

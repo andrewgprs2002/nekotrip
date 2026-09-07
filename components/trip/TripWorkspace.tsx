@@ -12,6 +12,7 @@ import { TripExpensesPanel } from '@/components/trip/TripExpensesPanel';
 import { TripMembersButton } from '@/components/trip/TripMembersButton';
 import { ProfileButton } from '@/components/profile/ProfileButton';
 import { TripMessageBoard } from '@/components/trip/TripMessageBoard';
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
 import { createClient } from '@/lib/supabase/client';
 import { countTripMembers, loadTripDays, loadTripPlaces } from '@/lib/repositories/trips';
@@ -849,7 +850,7 @@ export function TripWorkspace({
           }}
         />
       </div>
-      <div className="headerActions">
+      <div className="headerActions" data-onboarding="trip-collaboration">
         <TripMembersButton
           tripId={tripId}
           currentUserId={userId}
@@ -883,7 +884,7 @@ export function TripWorkspace({
     </header>
 
     <div className="workspaceGrid">
-      <section className="panel itineraryPanel">
+      <section className="panel itineraryPanel" data-onboarding="trip-add-place">
         <div className="sectionHeading">
           <div><strong>Add place</strong><small>{canEdit ? 'Search Google Places; every change is persisted and synced.' : 'Viewer access: browse only.'}</small></div>
         </div>
@@ -917,7 +918,7 @@ export function TripWorkspace({
           </button>)}
         </div>}
 
-        <div className="filters">
+        <div className="filters" data-onboarding="trip-days">
           <button type="button" onClick={() => setFilter('all')} className={filter === 'all' ? 'filter active' : 'filter'}>All</button>
           <button type="button" onClick={() => setFilter('unplanned')} className={filter === 'unplanned' ? 'filter active' : 'filter'}>Unplanned</button>
           {days.map((value) => <button key={value.id} type="button" onClick={() => setFilter(value.id)} className={filter === value.id ? 'filter active' : 'filter'}>{value.title}</button>)}
@@ -1074,7 +1075,7 @@ export function TripWorkspace({
 
       <TripExpensesPanel tripId={tripId} items={items} canEdit={canEdit} />
 
-      <section className="panel mapPanel">
+      <section className="panel mapPanel" data-onboarding="trip-route">
         <div className="mapHeader">
           <div><strong>Trip Map</strong><small>Choose a day to draw its route. Reordering stops recalculates the route automatically.</small></div>
           <span>{mappedCount} mapped / {visible.length} visible</span>
@@ -1219,6 +1220,7 @@ export function TripWorkspace({
         </div>
       </section>
     </div>
+    <OnboardingTour page="trip" />
     <footer className="tripFooter">Trip slug: <code>{tripSlug}</code></footer>
   </main>;
 }

@@ -5,6 +5,7 @@ import { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProfileButton } from '@/components/profile/ProfileButton';
 import { WishlistMembersButton } from '@/components/wishlist/WishlistMembersButton';
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { GoogleTripMap } from '@/components/map/GoogleTripMap';
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
@@ -805,7 +806,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
           {activeSpace ? `${userName} · shared · ${activeSpace.role}` : `${userName} · private`}
         </div>
       </div>
-      <div className="headerActions">
+      <div className="headerActions" data-onboarding="wishlist-collections">
         <select
           className="inlineMetaSelect"
           value={activeSpaceId ?? ''}
@@ -921,7 +922,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
         </div>}
       </aside>
 
-      <section className="panel wishlistListPanel">
+      <section className="panel wishlistListPanel" data-onboarding="wishlist-search">
         <div className="sectionHeading"><div><strong>Add to wishlist</strong><small>Search once, decide which Trip later.</small></div></div>
         <form className="placeForm" onSubmit={(event) => { event.preventDefault(); void searchPlaces(); }}>
           <input value={query} disabled={!canEditWishlist} onChange={(event) => { setQuery(event.target.value); setResults([]); }} placeholder="例如：蔵王キツネ村" aria-label="Wishlist place search" />
@@ -991,7 +992,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
           </div>
         </section>}
 
-        <div className="wishlistBulkBar">
+        <div className="wishlistBulkBar" data-onboarding="wishlist-trip-actions">
           <div className="wishlistBulkTop">
             <strong>{selectedCount > 0 ? `${selectedCount} selected` : 'Select places'}</strong>
             <div className="wishlistBulkQuickActions">
@@ -1108,6 +1109,8 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
         <div className="selectedPanel">{selected ? <><div className="selectedLabel">Selected wish</div><strong>{categoryIcons[selected.category] ?? '📍'} {selected.name}</strong><small>{selected.formattedAddress ?? 'No mapped address'}</small><div className="selectedMeta">{selected.folderId ? folderById.get(selected.folderId)?.name ?? 'Folder' : 'Unfiled'} · {activeSpace ? (() => { const summary = ratingSummaries.get(selected.id); return summary?.average == null ? 'No ratings' : `Avg ${summary.average.toFixed(2)} / 5 (${summary.count})`; })() : <>{'★'.repeat(selected.rating)}{'☆'.repeat(5-selected.rating)}</>}</div><button className="secondaryButton compactButton" type="button" onClick={() => toggleBulkSelection(selected.id)}>{selectedIds.has(selected.id) ? 'Remove from selection' : 'Add to selection'}</button></> : <><div className="selectedLabel">Selected wish</div><span className="muted">Choose a saved place or map marker.</span></>}</div>
       </section>
     </div>
+
+    <OnboardingTour page="wishlist" />
 
     {createTripMode === 'create' && <div className="modalBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !bulkBusy) setCreateTripMode(null); }}>
       <section className="modalCard" role="dialog" aria-modal="true" aria-labelledby="wishlist-create-trip-title">

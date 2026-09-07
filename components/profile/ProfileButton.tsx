@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { resetNekoTripOnboarding } from '@/components/onboarding/OnboardingTour';
 
 export function ProfileButton() {
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
@@ -101,6 +102,15 @@ export function ProfileButton() {
 
           <div className="profilePopoverActions">
             <button
+              className="secondaryButton compactButton"
+              type="button"
+              onClick={() => {
+                resetNekoTripOnboarding();
+                setOpen(false);
+              }}
+            >
+              Replay tutorial
+            </button>            <button
               className="primaryButton compactButton"
               type="button"
               disabled={busy || !nickname.trim()}

@@ -5,6 +5,7 @@ import { SignOutButton } from '@/components/auth/SignOutButton';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
 import type { TripRole } from '@/lib/domain/types';
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,11 +53,11 @@ export default async function Home() {
   return <main className="homeShell">
     <header className="homeHeader">
       <div><div className="eyebrow">NekoTrip · Collaborative</div><h1>Your trips</h1><p className="muted">Signed in as {user.email}</p></div>
-      <div className="headerActions"><Link className="secondaryLink" href="/wishlist">Wish List</Link><SignOutButton /></div>
+      <div className="headerActions"><Link className="secondaryLink" href="/wishlist" data-onboarding="home-wishlist">Wish List</Link><SignOutButton /></div>
     </header>
 
     <div className="homeGrid">
-      <section className="panel">
+      <section className="panel" data-onboarding="home-create-trip">
         <h2>Create a trip</h2>
         <p className="muted">The creator becomes owner automatically. Four starter days are created for you.</p>
         <CreateTripForm />
@@ -68,5 +69,6 @@ export default async function Home() {
         <TripListManager trips={managedTrips} />
       </section>
     </div>
+      <OnboardingTour page="home" />
   </main>;
 }
