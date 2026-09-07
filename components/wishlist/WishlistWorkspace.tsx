@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleTripMap } from '@/components/map/GoogleTripMap';
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
@@ -48,6 +48,7 @@ interface SharedRatingSummary {
 interface Props {
   userId: string;
   userName: string;
+  initialSpaceId: string | null;
   initialSpaces: WishlistSpace[];
   initialFolders: WishlistFolder[];
   initialItems: WishlistItem[];
@@ -59,7 +60,15 @@ function errorMessage(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback;
 }
 
-export function WishlistWorkspace({ userId, userName, initialSpaces, initialFolders, initialItems, trips }: Props) {
+function rememberWishlistSelection(spaceId: string | null) {
+  if (spaceId) {
+    document.cookie = `nekotrip_wishlist_space=${encodeURIComponent(spaceId)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  } else {
+    document.cookie = 'nekotrip_wishlist_space=; Path=/; Max-Age=0; SameSite=Lax';
+  }
+}
+
+export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpaces, initialFolders, initialItems, trips }: Props) {
   const router = useRouter();
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? '';
@@ -69,7 +78,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
   if (apiKey && !providerRef.current) providerRef.current = new GooglePlacesProvider(apiKey);
 
   const [spaces, setSpaces] = useState(initialSpaces);
-  const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
+  const [activeSpaceId, setActiveSpaceId] = useState<string | null>(initialSpaceId);
   const [folders, setFolders] = useState(initialFolders);
   const [items, setItems] = useState(initialItems);
   const [scope, setScope] = useState<FolderScope>('all');
@@ -394,13 +403,22 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     setSelectedId(null);
     setSelectedIds(new Set());
     setActiveSpaceId(nextSpaceId);
+    rememberWishlistSelection(nextSpaceId);
     try {
       await refresh(nextSpaceId);
       await Promise.all([
         refreshSharedMembers(nextSpaceId),
         refreshSharedRatings(nextSpaceId),
       ]);
+
+      const nextUrl = nextSpaceId
+        ? `/wishlist?space=${encodeURIComponent(nextSpaceId)}`
+        : '/wishlist';
+      router.replace(nextUrl, { scroll: false });
     } catch (cause) {
+      setActiveSpaceId(null);
+      rememberWishlistSelection(null);
+      router.replace('/wishlist', { scroll: false });
       setMessage(errorMessage(cause, 'Unable to load this Wishlist.'));
     }
   };
@@ -433,6 +451,17 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     }
   };
 
+  useEffect(() => {
+    if (!initialSpaceId) return;
+
+    void Promise.all([
+      refreshSharedMembers(initialSpaceId),
+      refreshSharedRatings(initialSpaceId),
+    ]);
+    // The server already loaded folders/items for this exact space. This
+    // effect only hydrates collaborator/rating side data once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const removeSharedWishlistMember = async (targetUserId: string) => {
     if (!activeSpaceId || activeSpace?.role !== 'owner') return;
     setMemberBusy(true); setMessage('');
@@ -474,6 +503,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
       const nextSpaces = await loadWishlistSpaces(supabaseRef.current!, userId);
       setSpaces(nextSpaces);
       setActiveSpaceId(null);
+      router.replace('/wishlist', { scroll: false });
       setScope('all');
       setSelectedId(null);
       setSelectedIds(new Set());
