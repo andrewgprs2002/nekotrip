@@ -117,7 +117,9 @@ export function TripExpensesPanel({ tripId, items, canEdit }: TripExpensesPanelP
     };
 
     void run();
-    const timer = window.setInterval(() => void run(), 10000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void run();
+    }, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

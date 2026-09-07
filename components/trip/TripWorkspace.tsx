@@ -381,12 +381,16 @@ export function TripWorkspace({
 
   useEffect(() => {
     void refreshTripRatingContext();
-    const timer = window.setInterval(() => void refreshTripRatingContext(), 10000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshTripRatingContext();
+    }, 60000);
     return () => window.clearInterval(timer);
   }, [refreshTripRatingContext]);
   useEffect(() => {
     void refreshTripConsensus();
-    const timer = window.setInterval(() => void refreshTripConsensus(), 10000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshTripConsensus();
+    }, 60000);
     return () => window.clearInterval(timer);
   }, [refreshTripConsensus]);
 

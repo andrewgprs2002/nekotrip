@@ -1891,3 +1891,14 @@ button.wishlistRankingRow:hover {
 .tripConsensusSource {
   overflow-wrap: anywhere;
 }
+
+/* v0.8.14 Wishlist lifecycle */
+.wishlistDeleteSpaceButton {
+  margin-top: 10px;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.wishlistDeleteSpaceButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}

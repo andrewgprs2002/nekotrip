@@ -451,6 +451,44 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
     }
   };
 
+  const deleteSharedWishlist = async () => {
+    if (!activeSpaceId || activeSpace?.role !== 'owner') return;
+
+    const confirmed = window.confirm(
+      `Delete “${activeSpace.name}”?` +
+      `\n\nThis permanently deletes this Shared Wishlist, its folders, saved places and ratings.` +
+      `\n\nTrips created from or linked to this Wishlist will NOT be deleted. Their current member ratings will be preserved as detached Trip snapshots.` +
+      `\n\nThis cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setShareBusy(true);
+    setMessage('');
+    try {
+      const deletedName = activeSpace.name;
+      const { error } = await supabaseRef.current!.rpc('delete_shared_wishlist', {
+        p_space_id: activeSpaceId,
+      });
+      if (error) throw error;
+
+      const nextSpaces = await loadWishlistSpaces(supabaseRef.current!, userId);
+      setSpaces(nextSpaces);
+      setActiveSpaceId(null);
+      setScope('all');
+      setSelectedId(null);
+      setSelectedIds(new Set());
+      await refresh(null);
+      await Promise.all([
+        refreshSharedMembers(null),
+        refreshSharedRatings(null),
+      ]);
+      setMessage(`Deleted Shared Wishlist “${deletedName}”. Linked Trips were preserved.`);
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to delete Shared Wishlist.'));
+    } finally {
+      setShareBusy(false);
+    }
+  };
   const createSharedWishlist = async () => {
     if (!shareName.trim()) return;
     setShareBusy(true); setMessage('');
@@ -837,6 +875,14 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
             onClick={() => void addSharedWishlistMember()}
           >
             {memberBusy ? 'Adding…' : 'Add collaborator'}
+          </button>
+          <button
+            className="secondaryButton wishlistDeleteSpaceButton"
+            type="button"
+            disabled={shareBusy}
+            onClick={() => void deleteSharedWishlist()}
+          >
+            {shareBusy ? 'Deleting…' : 'Delete Shared Wishlist'}
           </button>
         </div>}
       </aside>

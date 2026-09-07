@@ -104,7 +104,7 @@ export function TripMessageBoard({
       if (!cancelled && document.visibilityState === 'visible') {
         void refresh();
       }
-    }, 5000);
+    }, 60000);
 
     const channel = supabase
       .channel(`trip-messages:${tripId}`)
