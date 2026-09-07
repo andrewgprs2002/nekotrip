@@ -470,7 +470,68 @@ export function TripWorkspace({
 
       const handleTripChange = (payload: unknown) => {
         console.debug('NekoTrip Realtime broadcast', payload);
-        void Promise.all([refreshTripMeta(), refreshDays(), refreshPlaces(), refreshMembers()]);
+
+        const envelope = payload as {
+          payload?: { reason?: unknown };
+          reason?: unknown;
+        };
+        const rawReason = envelope?.payload?.reason ?? envelope?.reason;
+        const reason = typeof rawReason === 'string' ? rawReason : '';
+
+        if (reason === 'trip_renamed') {
+          void refreshTripMeta();
+          return;
+        }
+
+        if (reason === 'rating_updated') {
+          void Promise.all([refreshTripRatingContext(), refreshTripConsensus()]);
+          return;
+        }
+
+        if (reason === 'trip_dates_updated' || reason === 'trip_dates_changed') {
+          void Promise.all([refreshTripMeta(), refreshDays(), refreshPlaces()]);
+          return;
+        }
+
+        if (reason === 'day_route_settings_updated') {
+          void refreshDays();
+          return;
+        }
+
+        if (reason === 'day_route_order_optimized') {
+          void refreshPlaces();
+          return;
+        }
+
+        if (reason.startsWith('day_')) {
+          void Promise.all([refreshDays(), refreshPlaces()]);
+          return;
+        }
+
+        if (reason.startsWith('place_')) {
+          void refreshPlaces();
+          return;
+        }
+
+        if (reason.startsWith('member_') || reason.startsWith('trip_member_')) {
+          void refreshMembers();
+          return;
+        }
+
+        if (reason === 'trip_deleting') {
+          void refreshTripMeta();
+          return;
+        }
+
+        // Unknown/legacy event: correctness wins over request minimization.
+        void Promise.all([
+          refreshTripMeta(),
+          refreshDays(),
+          refreshPlaces(),
+          refreshMembers(),
+          refreshTripRatingContext(),
+          refreshTripConsensus(),
+        ]);
       };
 
       channel = supabase
@@ -509,41 +570,60 @@ export function TripWorkspace({
       realtimeChannelRef.current = null;
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [refreshDays, refreshMembers, refreshPlaces, refreshTripMeta, tripId]);
+  }, [refreshDays, refreshMembers, refreshPlaces, refreshTripConsensus, refreshTripMeta, refreshTripRatingContext, tripId]);
 
-  // Deterministic database fallback. Broadcast remains the low-latency fast path,
-  // but this tiny revision poll guarantees that another editor's committed
-  // changes are noticed even if a WebSocket event is dropped or blocked.
+  // Deterministic database fallback. Realtime Broadcast is the low-latency
+  // path; this low-frequency revision check exists only to recover from a
+  // dropped/blocked event. Hidden tabs do not poll.
   useEffect(() => {
     const supabase = supabaseRef.current!;
     let cancelled = false;
 
-    const checkRevision = async (forceRefresh = false) => {
+    const checkRevision = async () => {
       if (cancelled || pollBusyRef.current) return;
       pollBusyRef.current = true;
+
       try {
         const { data, error } = await supabase
           .from('trips')
           .select('name,start_date,updated_at')
           .eq('id', tripId)
           .maybeSingle();
+
         if (error) throw error;
         if (!data) {
           router.replace('/');
-          router.refresh();
           return;
         }
 
-        setTripTitle(data.name);
-        setStartDate(data.start_date ?? null);
         const revision = data.updated_at ?? null;
-        const changed = revision !== null && lastTripRevisionRef.current !== null && revision !== lastTripRevisionRef.current;
-        const firstRun = lastTripRevisionRef.current === null;
+        const previousRevision = lastTripRevisionRef.current;
+        const firstRun = previousRevision === null;
+        const changed =
+          revision !== null &&
+          previousRevision !== null &&
+          revision !== previousRevision;
+
         lastTripRevisionRef.current = revision;
 
-        if (forceRefresh || firstRun || changed) {
-          console.debug('NekoTrip DB sync', { forceRefresh, firstRun, changed, revision });
-          await Promise.all([refreshDays(), refreshPlaces(), refreshMembers()]);
+        // The server-rendered initial Trip data is already current, so the
+        // first revision read only establishes the baseline.
+        if (firstRun) return;
+
+        if (changed) {
+          console.debug('NekoTrip DB fallback sync', {
+            previousRevision,
+            revision,
+          });
+
+          await Promise.all([
+            refreshTripMeta(),
+            refreshDays(),
+            refreshPlaces(),
+            refreshMembers(),
+            refreshTripRatingContext(),
+            refreshTripConsensus(),
+          ]);
         }
       } catch (cause) {
         console.warn('NekoTrip DB fallback sync failed', cause);
@@ -552,14 +632,20 @@ export function TripWorkspace({
       }
     };
 
-    void checkRevision(true);
+    void checkRevision();
+
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void checkRevision(false);
-    }, 2500);
-    const onFocus = () => void checkRevision(true);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void checkRevision(true);
+      if (document.visibilityState === 'visible') void checkRevision();
+    }, 30000);
+
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') void checkRevision();
     };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void checkRevision();
+    };
+
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
 
@@ -569,7 +655,16 @@ export function TripWorkspace({
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refreshDays, refreshMembers, refreshPlaces, router, tripId]);
+  }, [
+    refreshDays,
+    refreshMembers,
+    refreshPlaces,
+    refreshTripConsensus,
+    refreshTripMeta,
+    refreshTripRatingContext,
+    router,
+    tripId,
+  ]);
 
   const selectPlace = useCallback((id: string) => setSelectedId(id), []);
 
