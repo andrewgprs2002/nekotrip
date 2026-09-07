@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 
 interface TripMemberRow {
   userId: string;
-  email: string;
+    nickname: string;
+email: string;
   role: 'owner' | 'editor' | 'viewer';
   joinedAt: string | null;
 }
@@ -47,6 +48,7 @@ export function TripMembersButton({
         Array.isArray(data)
           ? data.map((row: any) => ({
               userId: row.user_id as string,
+              nickname: (row.nickname ?? 'Traveler') as string,
               email: (row.email ?? 'Unknown member') as string,
               role: row.role as TripMemberRow['role'],
               joinedAt: (row.joined_at ?? null) as string | null,
@@ -67,7 +69,7 @@ export function TripMembersButton({
   async function removeMember(member: TripMemberRow) {
     if (currentUserRole !== 'owner' || member.role === 'owner') return;
 
-    const confirmed = window.confirm(`Remove ${member.email} from this Trip?`);
+    const confirmed = window.confirm(`Remove ${member.nickname} (${member.email}) from this Trip?`);
     if (!confirmed) return;
 
     setBusyUserId(member.userId);
@@ -81,7 +83,7 @@ export function TripMembersButton({
 
       await refresh();
       await onMembersChanged?.();
-      setMessage(`${member.email} removed from this Trip.`);
+      setMessage(`${member.nickname} removed from this Trip.`);
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Unable to remove Trip member.');
     } finally {
@@ -136,10 +138,11 @@ export function TripMembersButton({
                   <div className="tripMemberRow" key={member.userId}>
                     <div className="tripMemberIdentity">
                       <small className="tripMemberRole">{member.role}</small>
-                      <span className="tripMemberEmail">
-                        {member.email}
+                      <strong>
+                        {member.nickname}
                         {isCurrentUser ? ' (you)' : ''}
-                      </span>
+                      </strong>
+                      <span className="tripMemberEmail">{member.email}</span>
                       {canRemove && (
                         <button
                           type="button"

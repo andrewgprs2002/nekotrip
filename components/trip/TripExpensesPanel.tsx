@@ -10,7 +10,7 @@ type SplitMode = 'equal' | 'manual';
 
 interface ExpenseMember {
   userId: string;
-  email: string;
+  nickname: string;
   role: MemberRole;
 }
 
@@ -86,7 +86,7 @@ export function TripExpensesPanel({ tripId, items, canEdit }: TripExpensesPanelP
 
     setMembers(Array.isArray(memberData) ? memberData.map((row: any) => ({
       userId: row.user_id as string,
-      email: (row.email ?? 'Unknown user') as string,
+      nickname: (row.nickname ?? 'Traveler') as string,
       role: row.role as MemberRole,
     })) : []);
 
@@ -279,7 +279,7 @@ export function TripExpensesPanel({ tripId, items, canEdit }: TripExpensesPanelP
             const values = summary.members.get(member.userId) ?? { due: 0, paid: 0 };
             const balance = values.due - values.paid;
             return <div className="tripExpenseMemberSummaryRow" key={`${summaryCurrency}-${member.userId}`}>
-              <span title={member.email}>{member.email.split('@')[0]}</span>
+              <span>{member.nickname}</span>
               <span>Should pay <strong>{money(values.due, summaryCurrency)}</strong></span>
               <span>Paid <strong>{money(values.paid, summaryCurrency)}</strong></span>
               <span className={balance > 0.009 ? 'expenseBalanceDue' : balance < -0.009 ? 'expenseBalanceCredit' : ''}>
@@ -354,7 +354,7 @@ export function TripExpensesPanel({ tripId, items, canEdit }: TripExpensesPanelP
           const share = effectiveDraftShares.find((value) => value.userId === member.userId) ?? { userId: member.userId, amountDue: 0, amountPaid: 0 };
           const paid = share.amountDue > 0 && share.amountPaid + 0.009 >= share.amountDue;
           return <div className="tripExpenseShareRow" key={member.userId}>
-            <span className="tripExpenseShareEmail" title={member.email}>{member.email}</span>
+            <span className="tripExpenseShareEmail">{member.nickname}</span>
             <input
               type="number"
               min="0"

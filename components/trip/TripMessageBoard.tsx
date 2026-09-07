@@ -8,7 +8,7 @@ import { EmojiPicker, insertEmojiAtSelection } from '@/components/common/EmojiPi
 interface TripMessage {
   id: string;
   userId: string;
-  email: string;
+  nickname: string;
   message: string;
   createdAt: string;
 }
@@ -73,7 +73,7 @@ export function TripMessageBoard({
         ? data.map((row: any) => ({
             id: row.id as string,
             userId: row.user_id as string,
-            email: (row.email ?? 'Unknown member') as string,
+            nickname: (row.nickname ?? 'Traveler') as string,
             message: row.message as string,
             createdAt: row.created_at as string,
           }))
@@ -206,7 +206,7 @@ export function TripMessageBoard({
             return (
               <article className="tripMessageItem" key={message.id}>
                 <div className="tripMessageMeta">
-                  <strong>{message.email}</strong>
+                  <strong>{message.nickname}</strong>
                   <time dateTime={message.createdAt}>{formatTimestamp(message.createdAt)}</time>
                 </div>
                 <div className="tripMessageText">{message.message}</div>

@@ -28,9 +28,10 @@ export default async function WishlistPage({ searchParams }: WishlistPageProps) 
   // Authorization remains server/database driven. URL/cookie UUIDs are only
   // navigation preferences. A candidate is accepted only if this authenticated
   // user already has access to that Shared Wishlist.
-  const [spaces, trips] = await Promise.all([
+  const [spaces, trips, { data: profile }] = await Promise.all([
     loadWishlistSpaces(supabase, user.id),
     loadWritableTrips(supabase, user.id),
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
   ]);
 
   const canAccessSpace = (spaceId: string | null) =>
@@ -52,7 +53,7 @@ export default async function WishlistPage({ searchParams }: WishlistPageProps) 
 
   return <WishlistWorkspace
     userId={user.id}
-    userName={user.email ?? 'Traveler'}
+    userName={profile?.display_name || 'Traveler'}
     initialSpaceId={initialSpaceId}
     initialSpaces={spaces}
     initialFolders={folders}

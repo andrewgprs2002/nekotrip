@@ -10,6 +10,7 @@ import { TripSettingsButton } from '@/components/trip/TripSettingsButton';
 import { TripDateControls } from '@/components/trip/TripDateControls';
 import { TripExpensesPanel } from '@/components/trip/TripExpensesPanel';
 import { TripMembersButton } from '@/components/trip/TripMembersButton';
+import { ProfileButton } from '@/components/profile/ProfileButton';
 import { TripMessageBoard } from '@/components/trip/TripMessageBoard';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
 import { createClient } from '@/lib/supabase/client';
@@ -856,6 +857,7 @@ export function TripWorkspace({
           memberCount={memberCount}
           onMembersChanged={refreshMembers}
         />
+        <ProfileButton />
         <ShareTripButton tripId={tripId} userId={userId} canInvite={memberRole === 'owner'} />
         <TripSettingsButton
           tripId={tripId}

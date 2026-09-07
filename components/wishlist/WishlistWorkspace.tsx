@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ProfileButton } from '@/components/profile/ProfileButton';
+import { WishlistMembersButton } from '@/components/wishlist/WishlistMembersButton';
 import { GoogleTripMap } from '@/components/map/GoogleTripMap';
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
@@ -31,7 +33,7 @@ type SharedRatingSort = 'folder' | 'average' | 'consensus';
 interface SharedRatingRow {
   itemId: string;
   userId: string;
-  email: string;
+  nickname: string;
   role: 'owner' | 'editor';
   rating: number;
 }
@@ -114,7 +116,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
   const [shareBusy, setShareBusy] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberBusy, setMemberBusy] = useState(false);
-  const [members, setMembers] = useState<Array<{ userId: string; email: string; role: 'owner' | 'editor' | 'viewer' }>>([]);
+  const [members, setMembers] = useState<Array<{ userId: string; nickname: string; role: 'owner' | 'editor' | 'viewer' }>>([]);
   const [membersBusy, setMembersBusy] = useState(false);
   const [sharedRatings, setSharedRatings] = useState<SharedRatingRow[]>([]);
   const [sharedRatingBusyId, setSharedRatingBusyId] = useState<string | null>(null);
@@ -368,7 +370,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
       ? data.map((row: any) => ({
           itemId: row.item_id as string,
           userId: row.user_id as string,
-          email: (row.email ?? 'Unknown user') as string,
+          nickname: (row.nickname ?? 'Traveler') as string,
           role: row.role as 'owner' | 'editor',
           rating: Number(row.rating),
         }))
@@ -439,7 +441,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
       const nextMembers = Array.isArray(data)
         ? data.map((row: any) => ({
             userId: row.user_id as string,
-            email: (row.email ?? 'Unknown user') as string,
+            nickname: (row.nickname ?? 'Traveler') as string,
             role: row.role as 'owner' | 'editor' | 'viewer',
           }))
         : [];
@@ -813,6 +815,8 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
           <option value="">🔒 My Wishlist</option>
           {spaces.map((space) => <option key={space.id} value={space.id}>👥 {space.name}</option>)}
         </select>
+        {activeSpaceId && <WishlistMembersButton spaceId={activeSpaceId} memberCount={members.length} />}
+        <ProfileButton />
         <button className="secondaryButton compactButton" type="button" onClick={() => void Promise.all([refresh(), refreshSharedRatings()])}>Refresh</button>
         <Link className="secondaryLink" href="/">Trips</Link>
       </div>
@@ -878,7 +882,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
             {!membersBusy && members.map((member) => <div className="wishlistMemberRow" key={member.userId}>
               <div className="wishlistMemberIdentity">
                 <small className="wishlistMemberRole">{member.role}</small>
-                <span className="wishlistMemberEmail">{member.email}</span>
+                <span className="wishlistMemberEmail">{member.nickname}</span>
                 {member.role !== 'owner' && <button
                   className="wishlistMemberRemove"
                   type="button"
@@ -1082,8 +1086,8 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
                   </div>
                   <div className="wishlistMemberRatings">
                     {rows.length === 0 && <span className="muted">No editor ratings yet.</span>}
-                    {rows.map((row) => <span key={`${item.id}-${row.userId}`} className="wishlistMemberRatingPill" title={row.email}>
-                      <span>{row.email.split('@')[0]}</span>
+                    {rows.map((row) => <span key={`${item.id}-${row.userId}`} className="wishlistMemberRatingPill" title={row.nickname}>
+                      <span>{row.nickname}</span>
                       <strong>{row.rating.toFixed(1)}</strong>
                     </span>)}
                   </div>
