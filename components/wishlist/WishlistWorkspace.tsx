@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import { ProfileButton } from '@/components/profile/ProfileButton';
 import { WishlistMembersButton } from '@/components/wishlist/WishlistMembersButton';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher';
+import { AutoTranslate } from '@/components/i18n/AutoTranslate';
+import type { Locale } from '@/lib/i18n';
 import { GoogleTripMap } from '@/components/map/GoogleTripMap';
 import { GooglePlaceDetailsCard } from '@/components/place/GooglePlaceDetailsCard';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
@@ -49,6 +52,7 @@ interface SharedRatingSummary {
 }
 
 interface Props {
+  locale: Locale;
   userId: string;
   userName: string;
   initialSpaceId: string | null;
@@ -71,7 +75,7 @@ function rememberWishlistSelection(spaceId: string | null) {
   }
 }
 
-export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpaces, initialFolders, initialItems, trips }: Props) {
+export function WishlistWorkspace({ locale, userId, userName, initialSpaceId, initialSpaces, initialFolders, initialItems, trips }: Props) {
   const router = useRouter();
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? '';
@@ -807,6 +811,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
         </div>
       </div>
       <div className="headerActions" data-onboarding="wishlist-collections">
+        <LanguageSwitcher locale={locale} />
         <select
           className="inlineMetaSelect"
           value={activeSpaceId ?? ''}
@@ -1110,6 +1115,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
       </section>
     </div>
 
+    <AutoTranslate locale={locale} />
     <OnboardingTour page="wishlist" />
 
     {createTripMode === 'create' && <div className="modalBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !bulkBusy) setCreateTripMode(null); }}>
@@ -1135,3 +1141,4 @@ export function WishlistWorkspace({ userId, userName, initialSpaceId, initialSpa
     </div>}
   </main>;
 }
+

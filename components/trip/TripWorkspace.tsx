@@ -13,6 +13,9 @@ import { TripMembersButton } from '@/components/trip/TripMembersButton';
 import { ProfileButton } from '@/components/profile/ProfileButton';
 import { TripMessageBoard } from '@/components/trip/TripMessageBoard';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher';
+import { AutoTranslate } from '@/components/i18n/AutoTranslate';
+import type { Locale } from '@/lib/i18n';
 import { GooglePlacesProvider, type PlaceSearchResult } from '@/lib/providers/places';
 import { createClient } from '@/lib/supabase/client';
 import { countTripMembers, loadTripDays, loadTripPlaces } from '@/lib/repositories/trips';
@@ -52,6 +55,7 @@ function errorMessage(cause: unknown, fallback: string) {
 }
 
 interface TripWorkspaceProps {
+  locale: Locale;
   tripId: string;
   tripSlug: string;
   tripName: string;
@@ -67,7 +71,7 @@ interface TripWorkspaceProps {
 }
 
 export function TripWorkspace({
-  tripId, tripSlug, tripName, tripStartDate, tripEndDate, tripTimezone, userId, userName, memberRole,
+  locale, tripId, tripSlug, tripName, tripStartDate, tripEndDate, tripTimezone, userId, userName, memberRole,
   initialDays, initialItems, initialMemberCount,
 }: TripWorkspaceProps) {
   const router = useRouter();
@@ -151,7 +155,7 @@ export function TripWorkspace({
   }, [items, filter, dayOrderById]);
   const mappedCount = visible.filter((item) => item.latitude !== null && item.longitude !== null).length;
   const selected = items.find((item) => item.id === selectedId) ?? null;
-  const routeEnabled = filter !== 'all';
+  const routeEnabled = filter !== 'all' && filter !== 'unplanned';
   const activeDay = filter !== 'all' && filter !== 'unplanned' ? dayById.get(filter) ?? null : null;
   const dayItems = activeDay ? visible : [];
   const hotelCandidates = useMemo(() => {
@@ -851,6 +855,7 @@ export function TripWorkspace({
         />
       </div>
       <div className="headerActions" data-onboarding="trip-collaboration">
+        <LanguageSwitcher locale={locale} />
         <TripMembersButton
           tripId={tripId}
           currentUserId={userId}
@@ -1170,7 +1175,7 @@ export function TripWorkspace({
                   : <span className="routeStatus">Waiting</span>}
           </div>
 
-          {!routeEnabled && <div className="routeHint">Choose Day 1 / Day 2 / Unplanned to calculate a route for that group.</div>}
+          {!routeEnabled && <div className="routeHint">Choose a day to calculate that day's route.</div>}
           {routeEnabled && mappedCount < visible.length && <div className="routeHint">{visible.length - mappedCount} unmapped stop{visible.length - mappedCount === 1 ? '' : 's'} will be skipped until a map location is attached.</div>}
           {routeEnabled && routeMode === 'TRANSIT' && <div className="routeHint">Transit uses Google’s current/default departure-time context until NekoTrip stores a departure time for the day.</div>}
           {routeEnabled && routeSummary.error && <div className="routeHint routeHintError">{routeSummary.error}</div>}
@@ -1220,7 +1225,9 @@ export function TripWorkspace({
         </div>
       </section>
     </div>
+    <AutoTranslate locale={locale} />
     <OnboardingTour page="trip" />
     <footer className="tripFooter">Trip slug: <code>{tripSlug}</code></footer>
   </main>;
 }
+

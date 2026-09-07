@@ -2036,3 +2036,41 @@ button.wishlistRankingRow:hover {
     width: 100%;
   }
 }
+
+
+
+/* v0.8.19 English / Traditional Chinese localization */
+.languageSwitcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.languageSwitcher button {
+  appearance: none;
+  border: 0;
+  padding: 2px 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.languageSwitcher button.active {
+  color: var(--text);
+}
+
+.authTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

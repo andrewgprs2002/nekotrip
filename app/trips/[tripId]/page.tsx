@@ -4,10 +4,12 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
 import { countTripMembers, loadTripDays, loadTripPlaces } from '@/lib/repositories/trips';
 import type { TripRole } from '@/lib/domain/types';
+import { getServerLocale } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TripPage({ params }: { params: Promise<{ tripId: string }> }) {
+  const locale = await getServerLocale();
   if (!isSupabaseConfigured()) redirect('/setup');
   const { tripId: slug } = await params;
   const supabase = await createClient();
@@ -34,6 +36,7 @@ export default async function TripPage({ params }: { params: Promise<{ tripId: s
   if (!membership) notFound();
 
   return <TripWorkspace
+    locale={locale}
     tripId={trip.id}
     tripSlug={trip.slug}
     tripName={trip.name}
@@ -48,3 +51,4 @@ export default async function TripPage({ params }: { params: Promise<{ tripId: s
     initialMemberCount={memberCount}
   />;
 }
+

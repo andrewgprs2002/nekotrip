@@ -6,18 +6,23 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
 import type { TripRole } from '@/lib/domain/types';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher';
+import { AutoTranslate } from '@/components/i18n/AutoTranslate';
+import { getServerLocale } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
+  const locale = await getServerLocale();
   if (!isSupabaseConfigured()) {
     return <main className="homeShell">
       <div className="heroCard">
-        <div className="eyebrow">NekoTrip</div>
+        <div className="authTopRow"><div className="eyebrow">NekoTrip</div><LanguageSwitcher locale={locale} /></div>
         <h1>Collaborative foundation is ready.</h1>
         <p>Google Maps is wired. Add Supabase credentials to unlock accounts, persistent trips, invitations, and realtime editing.</p>
         <Link className="primaryLink" href="/setup">Open setup checklist</Link>
       </div>
+      <AutoTranslate locale={locale} />
     </main>;
   }
 
@@ -27,11 +32,12 @@ export default async function Home() {
   if (!user) {
     return <main className="homeShell">
       <div className="heroCard">
-        <div className="eyebrow">NekoTrip</div>
+        <div className="authTopRow"><div className="eyebrow">NekoTrip</div><LanguageSwitcher locale={locale} /></div>
         <h1>Trips, planned together.</h1>
         <p>Shared itinerary, Google Places, live map markers, and realtime collaboration.</p>
         <Link className="primaryLink" href="/login">Sign in</Link>
       </div>
+      <AutoTranslate locale={locale} />
     </main>;
   }
 
@@ -53,7 +59,7 @@ export default async function Home() {
   return <main className="homeShell">
     <header className="homeHeader">
       <div><div className="eyebrow">NekoTrip · Collaborative</div><h1>Your trips</h1><p className="muted">Signed in as {user.email}</p></div>
-      <div className="headerActions"><Link className="secondaryLink" href="/wishlist" data-onboarding="home-wishlist">Wish List</Link><SignOutButton /></div>
+      <div className="headerActions"><LanguageSwitcher locale={locale} /><Link className="secondaryLink" href="/wishlist" data-onboarding="home-wishlist">Wish List</Link><SignOutButton /></div>
     </header>
 
     <div className="homeGrid">
@@ -69,6 +75,8 @@ export default async function Home() {
         <TripListManager trips={managedTrips} />
       </section>
     </div>
+      <AutoTranslate locale={locale} />
       <OnboardingTour page="home" />
   </main>;
 }
+

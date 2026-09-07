@@ -4,6 +4,7 @@ import { WishlistWorkspace } from '@/components/wishlist/WishlistWorkspace';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
 import { loadWishlistFolders, loadWishlistItems, loadWishlistSpaces, loadWritableTrips } from '@/lib/repositories/wishlist';
+import { getServerLocale } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ interface WishlistPageProps {
 }
 
 export default async function WishlistPage({ searchParams }: WishlistPageProps) {
+  const locale = await getServerLocale();
   if (!isSupabaseConfigured()) redirect('/setup');
 
   const supabase = await createClient();
@@ -52,6 +54,7 @@ export default async function WishlistPage({ searchParams }: WishlistPageProps) 
   ]);
 
   return <WishlistWorkspace
+    locale={locale}
     userId={user.id}
     userName={profile?.display_name || 'Traveler'}
     initialSpaceId={initialSpaceId}
