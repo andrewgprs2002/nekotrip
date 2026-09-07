@@ -464,6 +464,13 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
       const newSpaceId = typeof data === 'string' ? data : null;
       if (!newSpaceId) throw new Error('Shared Wishlist was created but no collection id was returned.');
 
+      if (shareCopyExisting) {
+        const { error: ratingSeedError } = await supabaseRef.current!.rpc('seed_shared_wishlist_owner_ratings', {
+          p_space_id: newSpaceId,
+        });
+        if (ratingSeedError) throw ratingSeedError;
+      }
+
       const inviteEmail = shareInviteEmail.trim();
       if (inviteEmail) {
         const { error: inviteError } = await supabaseRef.current!.rpc('add_wishlist_space_member_by_email', {
@@ -775,7 +782,7 @@ export function WishlistWorkspace({ userId, userName, initialSpaces, initialFold
               checked={shareCopyExisting}
               onChange={(event) => setShareCopyExisting(event.target.checked)}
             />
-            <span>Copy my current private folders, places and notes</span>
+            <span>Copy my current private folders, places, notes and ratings (snapshot)</span>
           </label>
           <input
             type="email"

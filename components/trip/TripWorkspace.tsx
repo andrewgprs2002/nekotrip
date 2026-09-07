@@ -28,6 +28,14 @@ interface TripWishlistConsensus {
   consensusScore: number | null;
   tripRank: number | null;
 }
+interface TripRatingContext {
+  tripPlaceId: string;
+  ratingSource: 'shared_linked' | 'private_snapshot' | 'manual';
+  sourceWishlistItemId: string | null;
+  sourceWishlistName: string | null;
+  yourRating: number | null;
+  canRate: boolean;
+}
 const categories = ['Sightseeing', 'Restaurant', 'Cafe', 'Hotel', 'Onsen', 'Shopping', 'Station'];
 const categoryIcons: Record<string, string> = {
   Sightseeing: '📷', Restaurant: '🍣', Cafe: '☕', Hotel: '🏨', Onsen: '♨️', Shopping: '🛍️', Station: '🚉',
@@ -65,6 +73,7 @@ export function TripWorkspace({
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? '';
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const [tripConsensus, setTripConsensus] = useState<TripWishlistConsensus[]>([]);
+  const [tripRatingContext, setTripRatingContext] = useState<TripRatingContext[]>([]);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
   const lastTripRevisionRef = useRef<string | null>(null);
   const pollBusyRef = useRef(false);
@@ -326,6 +335,26 @@ export function TripWorkspace({
     }
   }, [tripId, userId]);
 
+  const refreshTripRatingContext = useCallback(async () => {
+    try {
+      const { data, error } = await supabaseRef.current!.rpc('list_trip_rating_context', {
+        p_trip_id: tripId,
+      });
+      if (error) throw error;
+
+      setTripRatingContext(Array.isArray(data) ? data.map((row: any) => ({
+        tripPlaceId: row.trip_place_id as string,
+        ratingSource: row.rating_source as TripRatingContext['ratingSource'],
+        sourceWishlistItemId: (row.source_wishlist_item_id ?? null) as string | null,
+        sourceWishlistName: (row.source_wishlist_name ?? null) as string | null,
+        yourRating: row.your_rating === null ? null : Number(row.your_rating),
+        canRate: Boolean(row.can_rate),
+      })) : []);
+    } catch (cause) {
+      console.warn('Unable to refresh Trip rating context', cause);
+      setTripRatingContext([]);
+    }
+  }, [tripId]);
   const refreshTripConsensus = useCallback(async () => {
     try {
       const { data, error } = await supabaseRef.current!.rpc('list_trip_wishlist_consensus', {
@@ -351,6 +380,11 @@ export function TripWorkspace({
   }, [tripId]);
 
   useEffect(() => {
+    void refreshTripRatingContext();
+    const timer = window.setInterval(() => void refreshTripRatingContext(), 10000);
+    return () => window.clearInterval(timer);
+  }, [refreshTripRatingContext]);
+  useEffect(() => {
     void refreshTripConsensus();
     const timer = window.setInterval(() => void refreshTripConsensus(), 10000);
     return () => window.clearInterval(timer);
@@ -359,6 +393,10 @@ export function TripWorkspace({
   const consensusByPlaceId = useMemo(
     () => new Map(tripConsensus.map((row) => [row.tripPlaceId, row])),
     [tripConsensus]
+  );
+  const ratingContextByPlaceId = useMemo(
+    () => new Map(tripRatingContext.map((row) => [row.tripPlaceId, row])),
+    [tripRatingContext]
   );
   const refreshMembers = useCallback(async () => {
     try { setMemberCount(await countTripMembers(supabaseRef.current!, tripId)); } catch { /* non-critical */ }
@@ -635,6 +673,24 @@ export function TripWorkspace({
     }
   }
 
+  async function updateTripRating(id: string, nextRating: number | null) {
+    if (!canEdit || busyPlaceId) return;
+    setBusyPlaceId(id);
+    setMessage('');
+    try {
+      const { error } = await supabaseRef.current!.rpc('set_trip_place_rating', {
+        p_trip_place_id: id,
+        p_rating: nextRating,
+      });
+      if (error) throw error;
+      await Promise.all([refreshTripRatingContext(), refreshTripConsensus()]);
+      await broadcastTripChanged('rating_updated');
+    } catch (cause) {
+      setMessage(errorMessage(cause, 'Unable to update rating.'));
+    } finally {
+      setBusyPlaceId(null);
+    }
+  }
   async function updateStayDuration(id: string, minutes: number) {
     if (!canEdit || busyPlaceId) return;
     const cleanMinutes = Math.max(0, Math.min(1440, Math.round(minutes || 0)));
@@ -743,7 +799,7 @@ export function TripWorkspace({
             </select>
           </div>
           <div className="formRow">
-            <div className="tripConsensusHint">Consensus ratings come from Shared Wishlist. Manually added Trip places have no consensus source.</div>
+            <div className="tripConsensusHint">My Wishlist ratings are copied as Trip snapshots. Shared Wishlist ratings stay linked and can be edited from either page.</div>
             <button className="primaryButton" type="submit" disabled={!canEdit || searching || !query.trim()}>{searching ? 'Searching…' : 'Search Google'}</button>
           </div>
           <button className="secondaryButton" type="button" disabled={!canEdit || !query.trim()} onClick={() => void persistPlace(null)}>Add manually without map location</button>
@@ -812,6 +868,35 @@ export function TripWorkspace({
                   {categories.map((value) => <option key={value} value={value}>{categoryIcons[value] ?? '📍'} {value}</option>)}
                 </select>
               </label>
+              <div className="compactField tripRatingField">
+                <span>Your rating</span>
+                {(() => {
+                  const ratingContext = ratingContextByPlaceId.get(place.id);
+                  const sourceLabel = ratingContext?.ratingSource === 'shared_linked'
+                    ? `Linked to ${ratingContext.sourceWishlistName ?? 'Shared Wishlist'}`
+                    : ratingContext?.ratingSource === 'private_snapshot'
+                      ? 'Snapshot from My Wishlist'
+                      : 'Trip-only rating';
+
+                  return <>
+                    <select
+                      className="inlineMetaSelect"
+                      value={ratingContext?.yourRating ?? ''}
+                      disabled={!canEdit || busyPlaceId === place.id || ratingContext?.canRate === false}
+                      onChange={(event) => void updateTripRating(
+                        place.id,
+                        event.target.value ? Number(event.target.value) : null
+                      )}
+                      aria-label={`Change ${place.name} rating`}
+                    >
+                      <option value="">Not rated</option>
+                      {[5,4,3,2,1].map((value) => <option key={value} value={value}>{'★'.repeat(value)}{'☆'.repeat(5-value)}</option>)}
+                    </select>
+                    <small className="tripRatingSource">{sourceLabel}</small>
+                  </>;
+                })()}
+              </div>
+
               <div className="compactField tripConsensusField">
                 <span>Consensus ranking</span>
                 {(() => {
@@ -819,7 +904,7 @@ export function TripWorkspace({
                   if (!consensus) {
                     return <div className="tripConsensusValue">
                       <strong>No consensus rating</strong>
-                      <small>Not linked to an accessible Shared Wishlist.</small>
+                      <small>Available only for linked Shared Wishlist places.</small>
                     </div>;
                   }
 

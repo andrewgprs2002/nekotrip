@@ -1869,3 +1869,25 @@ button.wishlistRankingRow:hover {
     grid-template-columns: minmax(430px, 500px) minmax(620px, 1fr) minmax(440px, 520px);
   }
 }
+
+/* v0.8.13 Rating Source Model */
+.tripRatingField {
+  min-width: 150px;
+}
+
+.tripRatingField .inlineMetaSelect {
+  width: 100%;
+}
+
+.tripRatingSource {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.tripRatingSource,
+.tripConsensusSource {
+  overflow-wrap: anywhere;
+}
